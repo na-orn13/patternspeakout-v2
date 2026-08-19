@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface WordItem {
   id: string;
@@ -30,6 +31,7 @@ const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const CEFR_COLORS: Record<string, string> = { A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" };
 
 export default function DeckPage() {
+  const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [words, setWords] = useState<WordItem[]>([]);
   const [idioms, setIdioms] = useState<IdiomFav[]>([]);
@@ -151,7 +153,7 @@ export default function DeckPage() {
     return (
       <div className="deck-page">
         <div className="deck-header">
-          <Link href="/" className="deck-back">← Back</Link>
+          <button className="deck-back" onClick={() => router.back()}>← Back</button>
           <h1 className="deck-title">💾 My Deck</h1>
         </div>
         <div className="deck-login-box">
@@ -167,7 +169,7 @@ export default function DeckPage() {
     return (
       <div className="deck-page">
         <div className="deck-header">
-          <Link href="/" className="deck-back">← Back</Link>
+          <button className="deck-back" onClick={() => router.back()}>← Back</button>
           <h1 className="deck-title">💾 My Deck</h1>
         </div>
         <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>Loading…</div>
@@ -230,7 +232,7 @@ export default function DeckPage() {
   return (
     <div className="deck-page">
       <div className="deck-header">
-        <Link href="/" className="deck-back">← Back to Idioms</Link>
+        <button className="deck-back" onClick={() => router.back()}>← Back to Idioms</button>
         <h1 className="deck-title">💾 My Deck</h1>
         <div className="deck-stats">
           <span>{words.length} words</span>

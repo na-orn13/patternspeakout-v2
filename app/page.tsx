@@ -1111,8 +1111,8 @@ export default function Home() {
       {/* Footer */}
       <footer>
         <div className="footer-inner">
-          <div className="footer-logo">Pattern Speak Out</div>
-          <p>เว็บไซต์นี้เป็น Vlog Summary สรุปเนื้อหาจาก TikTok <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer">@patternspeakout</a><br />เหมาะสำหรับผู้เรียนภาษาอังกฤษทุกระดับ · ข้อมูลอ้างอิงตาม CEFR Framework</p>
+          <div className="footer-logo">patternspeakout</div>
+          <p>สรุปเนื้อหาจาก TikTok <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer">@patternspeakout</a><br />เหมาะสำหรับผู้เรียนภาษาอังกฤษทุกระดับ · ข้อมูลอ้างอิงตาม CEFR Framework</p>
           <a className="footer-tiktok-link" href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer"><span className="tiktok-logo" aria-hidden="true">tt</span>ดูช่องต้นฉบับบน TikTok</a>
         </div>
       </footer>

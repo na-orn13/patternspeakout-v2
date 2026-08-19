@@ -72,13 +72,13 @@ async function sendAdminNotification(userEmail: string, fullName: string, age: n
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Pattern Speak Out <onboarding@resend.dev>",
+      from: "patternspeakout <onboarding@resend.dev>",
       to: ["sweetpimja@gmail.com"],
       subject: `🆕 New Registration: ${fullName} (${userEmail})`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; max-width: 500px;">
           <h2 style="color: #ff2d55;">🆕 New User Registration</h2>
-          <p>A new user has registered on Pattern Speak Out and is waiting for your approval.</p>
+          <p>A new user has registered on patternspeakout and is waiting for your approval.</p>
           <table style="border-collapse: collapse; width: 100%; margin: 16px 0;">
             <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Full Name</td><td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td></tr>
             <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td><td style="padding: 8px; border: 1px solid #ddd;">${userEmail}</td></tr>
@@ -94,7 +94,7 @@ async function sendAdminNotification(userEmail: string, fullName: string, age: n
             <li>Open 👥 Users tab</li>
             <li>Click ✅ Approve next to this user</li>
           </ol>
-          <p style="color: #999; font-size: 12px;">— Pattern Speak Out System</p>
+          <p style="color: #999; font-size: 12px;">— patternspeakout</p>
         </div>
       `,
     }),
