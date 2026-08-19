@@ -112,19 +112,26 @@ export async function POST(req: NextRequest) {
     // Also regenerate summaries for any that still have the fallback text
     const existingCandidates = candidates.filter((v) => existingIds.has(v.tiktok_id));
 
-    // Fetch existing rows that still have fallback summaries so we can upgrade them
+    // Fetch existing rows that still have fallback summaries OR truncated ones to upgrade
     const { data: staleRows } = await supabase
       .from("videos")
       .select("tiktok_id, caption, title, summary")
-      .in("tiktok_id", existingCandidates.map((v) => v.tiktok_id))
-      .like("summary", "⚠️ Caption-based summary (AI unavailable)%");
+      .in("tiktok_id", existingCandidates.map((v) => v.tiktok_id));
+
+    // Filter: stale = fallback text OR truncated (< 200 chars and doesn't have all fields)
+    const needsRegen = (staleRows ?? []).filter((r) => {
+      if (!r.summary) return true;
+      if (r.summary.startsWith("⚠️ Caption-based summary (AI unavailable)")) return true;
+      // Truncated: has **Idiom:** but missing **Example (TH):**
+      if (r.summary.includes("**Idiom:**") && !r.summary.includes("**Example (TH):**")) return true;
+      return false;
+    });
 
     let regenerated = 0;
     // Process in batches of 3 to stay within function timeout
     const BATCH = 3;
-    const stale = staleRows ?? [];
-    for (let i = 0; i < stale.length && i < BATCH; i++) {
-      const row = stale[i];
+    for (let i = 0; i < needsRegen.length && i < BATCH; i++) {
+      const row = needsRegen[i];
       const result = await summariseFromCaption(row.caption, row.title);
       if (result) {
         await supabase
@@ -134,7 +141,7 @@ export async function POST(req: NextRequest) {
         regenerated++;
       }
     }
-    const remaining = Math.max(0, stale.length - BATCH);
+    const remaining = Math.max(0, needsRegen.length - BATCH);
 
     for (const video of existingCandidates) {
       await supabase

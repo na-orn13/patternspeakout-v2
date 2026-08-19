@@ -29,8 +29,8 @@ export async function summariseFromCaption(
   const model = genAI.getGenerativeModel({
     model: "gemini-3.6-flash",
     generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 600,
+      temperature: 0.4,
+      maxOutputTokens: 1200,
     },
   });
 
