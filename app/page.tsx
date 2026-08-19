@@ -9,8 +9,15 @@ interface KeyWord {
   pos: string;
   definitionEN: string;
   definitionTH: string;
-  synonyms: string[];
-  antonyms: string[];
+  synonyms: (string | RichWord)[];
+  antonyms: (string | RichWord)[];
+}
+
+interface RichWord {
+  word: string;
+  meaningTH: string;
+  pos?: string;
+  example?: string;
 }
 
 interface Example {
@@ -30,12 +37,24 @@ interface IdiomData {
   tiktokUrl?: string;
   definitionEN: string;
   definitionTH: string;
-  synonyms: string[];
-  antonyms: string[];
+  synonyms: (string | RichWord)[];
+  antonyms: (string | RichWord)[];
   keyWords: KeyWord[];
   examples: Example[];
   usage: string;
   context: string;
+}
+
+// Helper: normalize a synonym/antonym item (backward compat with old string format)
+function toRichWord(item: string | RichWord): RichWord {
+  if (typeof item === "string") return { word: item, meaningTH: "", pos: "", example: "" };
+  return item;
+}
+function getWordLabel(item: string | RichWord): string {
+  return typeof item === "string" ? item : item.word;
+}
+function getWordTH(item: string | RichWord): string {
+  return typeof item === "string" ? "" : (item.meaningTH || "");
 }
 
 interface Video {
@@ -455,21 +474,23 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10, fontWeight: 600 }}>✅ Synonyms (คำพ้องความหมาย)</div>
                   <div className="word-chips">{data.synonyms.map((s, i) => {
-                    const sId = `word_${s.toLowerCase().replace(/\s+/g, "_")}`;
+                    const rw = toRichWord(s);
+                    const sId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                     const sSaved = savedWordIds?.has(sId);
-                    return <span key={i} className={`chip chip-syn ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
-                      onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: s, cefr: data.cefr, pos: data.partOfSpeech, definitionEN: `Synonym of "${data.idiom}"`, definitionTH: `คำพ้องของ "${data.idiom}"` })}
-                    >{s}{onSaveWord && !sSaved && " +"}</span>;
+                    return <span key={i} className={`chip chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
+                      onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: `Synonym of "${data.idiom}"`, definitionTH: rw.meaningTH || `คำพ้องของ "${data.idiom}"`, example: rw.example })}
+                    ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10, fontWeight: 600 }}>❌ Antonyms (คำตรงข้าม)</div>
                   <div className="word-chips">{data.antonyms.map((a, i) => {
-                    const aId = `word_${a.toLowerCase().replace(/\s+/g, "_")}`;
+                    const rw = toRichWord(a);
+                    const aId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                     const aSaved = savedWordIds?.has(aId);
-                    return <span key={i} className={`chip chip-ant ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
-                      onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: a, cefr: data.cefr, pos: data.partOfSpeech, definitionEN: `Antonym of "${data.idiom}"`, definitionTH: `คำตรงข้ามของ "${data.idiom}"` })}
-                    >{a}{onSaveWord && !aSaved && " +"}</span>;
+                    return <span key={i} className={`chip chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
+                      onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: `Antonym of "${data.idiom}"`, definitionTH: rw.meaningTH || `คำตรงข้ามของ "${data.idiom}"`, example: rw.example })}
+                    ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
               </div>
@@ -513,11 +534,12 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                           <div className="keyword-syn-row">
                             <div className="keyword-syn-label">Synonyms</div>
                             <div className="mini-chips">{kw.synonyms.map((s, j) => {
-                              const sId = `word_${s.toLowerCase().replace(/\s+/g, "_")}`;
+                              const rw = toRichWord(s);
+                              const sId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                               const sSaved = savedWordIds?.has(sId);
-                              return <span key={j} className={`mini-chip mini-chip-syn ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
-                                onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: s, cefr: kw.cefr, pos: kw.pos, definitionEN: `Synonym of "${kw.word}"`, definitionTH: `คำพ้องของ "${kw.word}"` })}
-                              >{s}{onSaveWord && !sSaved && " +"}</span>;
+                              return <span key={j} className={`mini-chip mini-chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
+                                onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: `Synonym of "${kw.word}"`, definitionTH: rw.meaningTH || `คำพ้องของ "${kw.word}"`, example: rw.example })}
+                              ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
                         )}
@@ -525,11 +547,12 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                           <div className="keyword-ant-row">
                             <div className="keyword-ant-label">Antonyms</div>
                             <div className="mini-chips">{kw.antonyms.map((a, j) => {
-                              const aId = `word_${a.toLowerCase().replace(/\s+/g, "_")}`;
+                              const rw = toRichWord(a);
+                              const aId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                               const aSaved = savedWordIds?.has(aId);
-                              return <span key={j} className={`mini-chip mini-chip-ant ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
-                                onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: a, cefr: kw.cefr, pos: kw.pos, definitionEN: `Antonym of "${kw.word}"`, definitionTH: `คำตรงข้ามของ "${kw.word}"` })}
-                              >{a}{onSaveWord && !aSaved && " +"}</span>;
+                              return <span key={j} className={`mini-chip mini-chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
+                                onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: `Antonym of "${kw.word}"`, definitionTH: rw.meaningTH || `คำตรงข้ามของ "${kw.word}"`, example: rw.example })}
+                              ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
                         )}
@@ -727,9 +750,9 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "tiktokUrl": "",
   "definitionEN": "Polite ways to express disagreement in English.",
   "definitionTH": "วิธีพูดไม่เห็นด้วยอย่างสุภาพในภาษาอังกฤษ",
-  "synonyms": ["I see it differently", "I'm not sure about that", "I respectfully disagree"],
-  "antonyms": ["I totally agree", "Absolutely", "You're right"],
-  "keyWords": [{"word":"disagree","cefr":"A2","pos":"verb","definitionEN":"To have a different opinion","definitionTH":"ไม่เห็นด้วย","synonyms":["differ","oppose"],"antonyms":["agree"]}],
+  "synonyms": [{"word":"I see it differently","meaningTH":"ฉันมองต่างออกไป","pos":"phrase","example":"I see it differently — here's why."},{"word":"I'm not sure about that","meaningTH":"ฉันไม่ค่อยแน่ใจนะ","pos":"phrase","example":"I'm not sure about that approach."},{"word":"I respectfully disagree","meaningTH":"ฉันไม่เห็นด้วยด้วยความเคารพ","pos":"phrase","example":"I respectfully disagree with your conclusion."}],
+  "antonyms": [{"word":"I totally agree","meaningTH":"เห็นด้วยอย่างยิ่ง","pos":"phrase","example":"I totally agree with you."},{"word":"Absolutely","meaningTH":"แน่นอน","pos":"adverb","example":"Absolutely, that's a great idea."}],
+  "keyWords": [{"word":"disagree","cefr":"A2","pos":"verb","definitionEN":"To have a different opinion","definitionTH":"ไม่เห็นด้วย","synonyms":[{"word":"differ","meaningTH":"แตกต่าง"},{"word":"oppose","meaningTH":"คัดค้าน"}],"antonyms":[{"word":"agree","meaningTH":"เห็นด้วย"}]}],
   "examples": [
     {"en":"I see your point, but I respectfully disagree.","th":"ฉันเข้าใจมุมของคุณ แต่ฉันไม่เห็นด้วยค่ะ"},
     {"en":"I'm not sure I agree with that approach.","th":"ฉันไม่แน่ใจว่าเห็นด้วยกับวิธีนั้น"},
@@ -748,9 +771,9 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "tiktokUrl": "",
   "definitionEN": "You have to work hard and suffer to achieve something worthwhile.",
   "definitionTH": "ไม่มีความเจ็บปวด ก็ไม่มีความสำเร็จ — ต้องอดทนทำงานหนักถึงจะได้ผลลัพธ์ที่ดี",
-  "synonyms": ["no cross, no crown", "nothing ventured, nothing gained", "no guts, no glory"],
-  "antonyms": ["easy come, easy go", "take it easy"],
-  "keyWords": [{"word":"gain","cefr":"A2","pos":"noun/verb","definitionEN":"Something achieved; to obtain","definitionTH":"สิ่งที่ได้มา / ได้รับ","synonyms":["profit","achieve"],"antonyms":["loss","lose"]}],
+  "synonyms": [{"word":"no cross, no crown","meaningTH":"ไม่มีไม้กางเขน ก็ไม่มีมงกุฎ","pos":"proverb","example":"He kept going despite the pain — no cross, no crown."},{"word":"nothing ventured, nothing gained","meaningTH":"ไม่เสี่ยง ก็ไม่ได้อะไร","pos":"proverb","example":"I applied for the job anyway — nothing ventured, nothing gained."}],
+  "antonyms": [{"word":"easy come, easy go","meaningTH":"ได้มาง่าย ก็ไปง่าย","pos":"proverb","example":"He won the lottery but spent it all — easy come, easy go."},{"word":"take it easy","meaningTH":"ใจเย็นๆ / สบายๆ","pos":"phrase","example":"Don't stress — take it easy."}],
+  "keyWords": [{"word":"gain","cefr":"A2","pos":"noun/verb","definitionEN":"Something achieved; to obtain","definitionTH":"สิ่งที่ได้มา / ได้รับ","synonyms":[{"word":"profit","meaningTH":"กำไร"},{"word":"achieve","meaningTH":"บรรลุ"}],"antonyms":[{"word":"loss","meaningTH":"การสูญเสีย"},{"word":"lose","meaningTH":"สูญเสีย"}]}],
   "examples": [
     {"en":"I trained every day for months. No pain, no gain!","th":"ฉันฝึกทุกวันเป็นเดือน ไม่เจ็บก็ไม่ได้ผล!"},
     {"en":"Studying is hard, but no pain, no gain — you'll pass the exam.","th":"การเรียนมันยาก แต่ไม่ลำบากก็ไม่สำเร็จ — เธอจะสอบผ่าน"},
@@ -769,9 +792,9 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "tiktokUrl": "",
   "definitionEN": "To be precisely correct about something.",
   "definitionTH": "พูดถูกต้องแม่นยำ / ตรงประเด็น",
-  "synonyms": ["be spot on", "be exactly right", "be dead right"],
-  "antonyms": ["miss the point", "be off the mark", "be wide of the mark"],
-  "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A small metal spike hammered into wood","definitionTH":"ตะปู","synonyms":["pin","spike"],"antonyms":[]}],
+  "synonyms": [{"word":"be spot on","meaningTH":"ถูกต้องเป๊ะ","pos":"verb phrase","example":"You were spot on about the deadline."},{"word":"be exactly right","meaningTH":"ถูกต้องแม่นยำ","pos":"verb phrase","example":"She was exactly right."}],
+  "antonyms": [{"word":"miss the point","meaningTH":"พลาดประเด็น","pos":"verb phrase","example":"He missed the point entirely."},{"word":"be off the mark","meaningTH":"ผิดเป้า","pos":"verb phrase","example":"Your guess was off the mark."}],
+  "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A small metal spike hammered into wood","definitionTH":"ตะปู","synonyms":[{"word":"pin","meaningTH":"เข็มหมุด"},{"word":"spike","meaningTH":"หนาม"}],"antonyms":[]}],
   "examples": [
     {"en":"She hit the nail on the head with her analysis.","th":"เธอพูดได้ตรงประเด็นมากกับการวิเคราะห์"},
     {"en":"The critic hit the nail on the head with his review.","th":"นักวิจารณ์พูดได้ถูกต้องแม่นยำมากกับบทวิจารณ์"},
@@ -1047,21 +1070,6 @@ export default function Home() {
       case "cefr": { const o: Record<string, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 }; result.sort((a, b) => (o[getIdiomData(a)?.cefr ?? "B1"] ?? 3) - (o[getIdiomData(b)?.cefr ?? "B1"] ?? 3)); break; }
     }
     setFiltered(result);
-
-    // Compute episode numbers: oldest = 1, per category
-    const map = new Map<string, number>();
-    const catGroups: Record<string, Video[]> = {};
-    for (const v of videos) {
-      const d = getIdiomData(v);
-      const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
-      if (!catGroups[cat]) catGroups[cat] = [];
-      catGroups[cat].push(v);
-    }
-    for (const cat of Object.keys(catGroups)) {
-      catGroups[cat].sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
-      catGroups[cat].forEach((v, i) => map.set(v.tiktok_id, i + 1));
-    }
-    setEpMap(map);
   }, [videos, search, sort, cefrFilter, category]);
 
   // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers

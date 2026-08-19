@@ -130,6 +130,7 @@ export default function DeckPage() {
       backTH: w.data.definitionTH ?? "",
       cefr: w.data.cefr ?? "B1",
       pos: w.data.pos ?? "",
+      example: (w.data as { example?: string }).example ?? "",
     })),
     ...idioms.map(i => ({
       id: i.tiktokId,
@@ -139,6 +140,7 @@ export default function DeckPage() {
       backTH: i.definitionTH,
       cefr: i.cefr,
       pos: "",
+      example: "",
     })),
   ];
 
@@ -204,6 +206,7 @@ export default function DeckPage() {
                   {currentCard?.pos && <div className="flashcard-pos">{currentCard.pos}</div>}
                   <div className="flashcard-def-en">🇬🇧 {currentCard?.backEN}</div>
                   <div className="flashcard-def-th">🇹🇭 {currentCard?.backTH}</div>
+                  {currentCard?.example && <div className="flashcard-example">💬 {currentCard.example}</div>}
                 </div>
               </div>
             </div>
