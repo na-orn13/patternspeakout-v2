@@ -479,7 +479,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const sId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                     const sSaved = savedWordIds?.has(sId);
                     return <span key={i} className={`chip chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
-                      onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Similar meaning to "${data.idiom}": ${data.definitionEN}`, definitionTH: rw.meaningTH || `ความหมายคล้าย "${data.idiom}": ${data.definitionTH}`, example: rw.example })}
+                      onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Means the same as "${data.idiom}" — ${data.definitionEN}`, definitionTH: rw.meaningTH || data.definitionTH, example: rw.example })}
                     ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
@@ -490,7 +490,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const aId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                     const aSaved = savedWordIds?.has(aId);
                     return <span key={i} className={`chip chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
-                      onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Opposite meaning to "${data.idiom}": ${data.definitionEN}`, definitionTH: rw.meaningTH || `ความหมายตรงข้าม "${data.idiom}": ${data.definitionTH}`, example: rw.example })}
+                      onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Opposite of "${data.idiom}" — means NOT ${data.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${data.idiom}" — ${data.definitionTH}`, example: rw.example })}
                     ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
@@ -539,7 +539,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const sId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                               const sSaved = savedWordIds?.has(sId);
                               return <span key={j} className={`mini-chip mini-chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
-                                onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Similar meaning to "${kw.word}": ${kw.definitionEN}`, definitionTH: rw.meaningTH || `ความหมายคล้าย "${kw.word}": ${kw.definitionTH}`, example: rw.example })}
+                                onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Means the same as "${kw.word}" — ${kw.definitionEN}`, definitionTH: rw.meaningTH || kw.definitionTH, example: rw.example })}
                               ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
@@ -552,7 +552,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const aId = `word_${rw.word.toLowerCase().replace(/\s+/g, "_")}`;
                               const aSaved = savedWordIds?.has(aId);
                               return <span key={j} className={`mini-chip mini-chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
-                                onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Opposite meaning to "${kw.word}": ${kw.definitionEN}`, definitionTH: rw.meaningTH || `ความหมายตรงข้าม "${kw.word}": ${kw.definitionTH}`, example: rw.example })}
+                                onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Opposite of "${kw.word}" — means NOT ${kw.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${kw.word}" — ${kw.definitionTH}`, example: rw.example })}
                               ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
@@ -1147,11 +1147,12 @@ export default function Home() {
         addCategory={addCategory}
       />
 
-      {/* Status */}
-      <div className="status-bar"><div className="status-bar-inner">
-        <div className="last-updated"><span className="live-dot" /><span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span></div>
-        {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
-      </div></div>
+      {/* Deck button bar */}
+      {userSession && (
+        <div className="status-bar"><div className="status-bar-inner">
+          <a href="/deck" className="deck-page-btn">🃏 My Deck</a>
+        </div></div>
+      )}
 
       {/* Controls */}
       <nav className="controls-bar" aria-label="Filter and search">
