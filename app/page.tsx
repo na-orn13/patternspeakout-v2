@@ -1233,12 +1233,6 @@ export default function Home() {
         <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout</a>
         <h1><span className="gradient-text">Pattern SpeakOut</span></h1>
         <p className="subtitle">เรียนรู้ภาษาอังกฤษจาก TikTok <strong>@patternspeakout</strong> — Idiom, วิธีพูด, และแรงบันดาลใจ พร้อม CEFR, ความหมายไทย–อังกฤษ และตัวอย่างประโยค</p>
-        <div className="hero-stats">
-          <div className="stat-item"><div className="stat-number">{loading ? "…" : videos.length}</div><div className="stat-label">Episodes</div></div>
-          <div className="stat-item"><div className="stat-number">A1–C2</div><div className="stat-label">CEFR Levels</div></div>
-          <div className="stat-item"><div className="stat-number">🇹🇭 🇬🇧</div><div className="stat-label">Bilingual</div></div>
-          <div className="stat-item"><div className="stat-number">{loading ? "…" : filtered.filter(v => getIdiomData(v)?.examples?.length).reduce((a, v) => a + (getIdiomData(v)?.examples?.length ?? 0), 0)}+</div><div className="stat-label">Examples</div></div>
-        </div>
       </header>
 
       {/* Hamburger */}
@@ -1277,12 +1271,13 @@ export default function Home() {
         addCategory={addCategory}
       />
 
-      {/* Deck button bar */}
-      {userSession && (
-        <div className="status-bar"><div className="status-bar-inner">
-          <a href="/deck" className="deck-page-btn">🃏 My Deck</a>
-        </div></div>
-      )}
+      {/* Stats + Deck bar */}
+      <div className="status-bar"><div className="status-bar-inner">
+        <div className="deck-page-btn" style={{ cursor: "default", background: "rgba(0,245,212,0.06)", borderColor: "rgba(0,245,212,0.2)", color: "var(--accent-teal)" }}>
+          📊 {loading ? "…" : videos.length} Episodes · A1–C2 · 🇹🇭🇬🇧
+        </div>
+        {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
+      </div></div>
 
       {/* Controls */}
       <nav className="controls-bar" aria-label="Filter and search">
