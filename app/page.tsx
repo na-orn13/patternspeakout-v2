@@ -724,7 +724,7 @@ function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelPro
                 <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง เว็บจะแสดงข้อมูลเต็มรูปแบบเหมือนเว็บเก่า</p>
                 <form onSubmit={handleUpload}>
                   <div className="admin-field">
-                    <textarea className="admin-input" style={{ minHeight: 200, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
+                    <textarea className="admin-input" style={{ minHeight: 600, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
                       value={jsonText} onChange={(e) => { setJsonText(e.target.value); setUploadResult(null); }}
                       placeholder={sampleJson} required />
                   </div>
