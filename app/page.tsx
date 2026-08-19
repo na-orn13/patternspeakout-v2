@@ -473,8 +473,21 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
               <div className="admin-card">
                 <div className="admin-section-label">📋 JSON Template</div>
                 <p className="admin-hint">ส่ง prompt นี้ให้ ChatGPT เพื่อสร้าง JSON ให้คุณ:</p>
-                <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 150, overflow: "auto" }}>
-                  {`Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`}
+                <div style={{ position: "relative" }}>
+                  <button
+                    className="copy-btn"
+                    onClick={() => {
+                      const text = `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
+                      navigator.clipboard.writeText(text).then(() => onToast("Copied to clipboard!", "success")).catch(() => onToast("Copy failed", "error"));
+                    }}
+                    aria-label="Copy template to clipboard"
+                    title="Copy to clipboard"
+                  >
+                    📋 Copy
+                  </button>
+                  <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 12px 12px 12px", paddingTop: 36, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+                    {`Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`}
+                  </div>
                 </div>
               </div>
             </>
