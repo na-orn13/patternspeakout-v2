@@ -1782,3 +1782,90 @@ footer a:hover { text-decoration: underline; }
 .copy-btn:active {
   transform: scale(0.95);
 }
+
+/* ===== ADMIN EPISODE LIST ===== */
+.admin-episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.admin-episode-list::-webkit-scrollbar { width: 4px; }
+.admin-episode-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+.admin-ep-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: var(--transition);
+}
+
+.admin-ep-row:hover {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.02);
+}
+
+.admin-ep-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-ep-emoji {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.admin-ep-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-ep-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.admin-ep-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.admin-ep-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: var(--transition);
+}
+
+.admin-ep-btn.edit:hover {
+  background: rgba(0,245,212,0.1);
+  border-color: rgba(0,245,212,0.3);
+}
+
+.admin-ep-btn.delete:hover {
+  background: rgba(255,45,85,0.1);
+  border-color: rgba(255,45,85,0.3);
+}

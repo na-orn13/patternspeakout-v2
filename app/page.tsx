@@ -344,6 +344,28 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [episodes, setEpisodes] = useState<Array<{ tiktok_id: string; title: string; idiomData: IdiomData | null }>>([]);
+  const [editingEp, setEditingEp] = useState<{ tiktok_id: string; title: string; idiomData: IdiomData | null } | null>(null);
+  const [editJson, setEditJson] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editResult, setEditResult] = useState<string | null>(null);
+
+  // Fetch episodes when panel opens and user is authed
+  const fetchEpisodes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/videos", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const eps = (data.videos ?? []).map((v: Video) => ({
+        tiktok_id: v.tiktok_id,
+        title: v.title,
+        idiomData: (() => { try { const p = JSON.parse(v.summary || ""); return p?.idiom ? p : null; } catch { return null; } })(),
+      }));
+      setEpisodes(eps);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { if (open && authed) fetchEpisodes(); }, [open, authed, fetchEpisodes]);
 
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [open, onClose]);
   useEffect(() => { if (open) document.body.style.overflow = "hidden"; else document.body.style.overflow = ""; return () => { document.body.style.overflow = ""; }; }, [open]);
@@ -359,7 +381,43 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
     finally { setLoginLoading(false); }
   };
 
-  const handleLogout = () => { setAuthed(false); setToken(""); setLoginUser(""); setLoginPass(""); setLoginError(""); setUploadResult(null); setJsonText(""); };
+  const handleLogout = () => { setAuthed(false); setToken(""); setLoginUser(""); setLoginPass(""); setLoginError(""); setUploadResult(null); setJsonText(""); setEditingEp(null); };
+
+  const handleDelete = async (tiktokId: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch("/api/idioms/delete", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId }) });
+      const data = await res.json();
+      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
+      if (!res.ok) { onToast(`Delete failed: ${data.error}`, "error"); return; }
+      onToast(`🗑️ Deleted "${data.deleted}"`, "success");
+      setEpisodes(eps => eps.filter(e => e.tiktok_id !== tiktokId));
+      onRefresh();
+    } catch { onToast("Network error.", "error"); }
+  };
+
+  const handleEditStart = (ep: { tiktok_id: string; title: string; idiomData: IdiomData | null }) => {
+    setEditingEp(ep);
+    setEditJson(ep.idiomData ? JSON.stringify(ep.idiomData, null, 2) : "");
+    setEditResult(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingEp || !editJson.trim()) return;
+    setEditSaving(true); setEditResult(null);
+    try {
+      const parsed = JSON.parse(editJson);
+      const res = await fetch("/api/idioms/edit", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId: editingEp.tiktok_id, data: parsed }) });
+      const data = await res.json();
+      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
+      if (!res.ok) { setEditResult(`❌ ${data.error}`); return; }
+      setEditResult(`✅ ${data.message}`);
+      setEditingEp(null);
+      fetchEpisodes();
+      onRefresh();
+    } catch (err) { setEditResult(`❌ Invalid JSON: ${err instanceof Error ? err.message : "parse error"}`); }
+    finally { setEditSaving(false); }
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault(); if (!jsonText.trim()) return;
@@ -373,6 +431,7 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
       setUploadResult(`✅ ${data.message}`);
       setJsonText("");
       onRefresh();
+      fetchEpisodes();
     } catch (err) {
       setUploadResult(`❌ Invalid JSON: ${err instanceof Error ? err.message : "parse error"}`);
     } finally { setUploading(false); }
@@ -462,12 +521,51 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
                 </form>
               </div>
 
-              {/* Sync */}
+              {/* Episode list with edit/delete */}
               <div className="admin-card">
-                <div className="admin-section-label">🔄 Sync Seed Data</div>
-                <p className="admin-hint">Import the 12 starter idioms (won&apos;t duplicate existing ones).</p>
-                <button className="admin-action-btn" onClick={handleSyncAll} disabled={syncing}>{syncing ? <><span className="spin">↻</span> Syncing…</> : <>↻ Sync Now</>}</button>
+                <div className="admin-section-label">📚 จัดการ Episodes ({episodes.length})</div>
+                <div className="admin-episode-list">
+                  {episodes.map((ep) => {
+                    const d = ep.idiomData;
+                    return (
+                      <div key={ep.tiktok_id} className="admin-ep-row">
+                        <div className="admin-ep-info">
+                          <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
+                          <div>
+                            <div className="admin-ep-name">{d?.idiom ?? ep.title}</div>
+                            <div className="admin-ep-meta">{d?.episode ?? ""} · {d?.cefr ?? ""}</div>
+                          </div>
+                        </div>
+                        <div className="admin-ep-actions">
+                          <button className="admin-ep-btn edit" onClick={() => handleEditStart(ep)} title="Edit">✏️</button>
+                          <button className="admin-ep-btn delete" onClick={() => handleDelete(ep.tiktok_id, d?.idiom ?? ep.title)} title="Delete">🗑️</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {episodes.length === 0 && <p className="admin-hint" style={{ textAlign: "center", padding: 16 }}>ยังไม่มี Episode</p>}
+                </div>
               </div>
+
+              {/* Edit modal */}
+              {editingEp && (
+                <div className="admin-card" style={{ border: "1px solid var(--accent)", background: "rgba(255,45,85,0.04)" }}>
+                  <div className="admin-section-label">✏️ Editing: {editingEp.idiomData?.idiom ?? editingEp.title}</div>
+                  <div className="admin-field">
+                    <textarea className="admin-input" style={{ minHeight: 250, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
+                      value={editJson} onChange={(e) => setEditJson(e.target.value)} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="admin-action-btn" onClick={handleEditSave} disabled={editSaving}>
+                      {editSaving ? <><span className="spin">↻</span> Saving…</> : <>💾 Save</>}
+                    </button>
+                    <button className="admin-action-btn" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }} onClick={() => setEditingEp(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                  {editResult && <div className={`admin-result ${editResult.startsWith("✅") ? "ok" : "err"}`}>{editResult}</div>}
+                </div>
+              )}
 
               {/* Template */}
               <div className="admin-card">
