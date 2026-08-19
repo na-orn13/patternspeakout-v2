@@ -961,7 +961,7 @@ export default function Home() {
     if (category !== "all") {
       result = result.filter(v => {
         const data = getIdiomData(v);
-        const cat = (data as Record<string, unknown>)?.category as string | undefined;
+        const cat = data ? (data as unknown as Record<string, string>).category : undefined;
         // Default category for existing idioms is "idiom"
         const itemCat = cat || "idiom";
         return itemCat === category;
