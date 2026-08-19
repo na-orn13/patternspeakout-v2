@@ -652,10 +652,6 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   // Admin: user management
   const [users, setUsers] = useState<Array<{id:string;email:string;display_name:string;full_name:string;age:number|null;phone:string;role:string;status:string;expires_at:string|null;created_at:string}>>([]);
   const [usersLoading, setUsersLoading] = useState(false);
-  // Stats
-  const [stats, setStats] = useState<{ pageViews: { total: number; thisWeek: number; today: number }; topEpisodes: Array<{ id: string; title: string; clicks: number }>; topFavourites: Array<{ id: string; name: string; saves: number }>; activeUsersThisWeek: number; totalEvents: number } | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [open, onClose]);
   useEffect(() => { if (open) document.body.style.overflow = "hidden"; else document.body.style.overflow = ""; return () => { document.body.style.overflow = ""; }; }, [open]);
 
@@ -726,16 +722,6 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
       if (res.ok) setUsers(data.users ?? []);
     } catch { /* ignore */ }
     finally { setUsersLoading(false); }
-  };
-
-  const fetchStats = async () => {
-    setStatsLoading(true);
-    try {
-      const res = await fetch("/api/analytics", { headers: { Authorization: `Bearer ${adminToken}` } });
-      const data = await res.json();
-      if (res.ok) setStats(data);
-    } catch { /* ignore */ }
-    finally { setStatsLoading(false); }
   };
 
   const handleUserAction = async (userId: string, action: string, extraValue?: string) => {
@@ -832,7 +818,6 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           <div className="panel-tabs">
             {userSession.role === "admin" && <button className={`panel-tab ${tab === "admin" ? "active" : ""}`} onClick={() => setTab("admin")}>📝 Admin</button>}
             {userSession.role === "admin" && <button className={`panel-tab ${tab === "users" ? "active" : ""}`} onClick={() => { setTab("users"); fetchUsers(); }}>👥 Users</button>}
-            {userSession.role === "admin" && <button className={`panel-tab ${tab === "stats" ? "active" : ""}`} onClick={() => { setTab("stats"); fetchStats(); }}>📊 Stats</button>}
             <button className={`panel-tab ${tab === "deck" ? "active" : ""}`} onClick={() => setTab("deck")}>💾 My Deck</button>
             <button className="panel-tab" onClick={handleLogout}>🚪</button>
           </div>
@@ -1010,75 +995,6 @@ ${sampleJson}`;
             </div>
           )}
 
-          {/* ─── Stats tab ─── */}
-          {userSession?.role === "admin" && tab === "stats" && (
-            <div>
-              <div className="admin-section-label">📊 Analytics Dashboard</div>
-              {statsLoading ? <p className="admin-hint">Loading stats…</p> : stats ? (
-                <>
-                  {/* Page views */}
-                  <div className="admin-card" style={{ marginBottom: 12 }}>
-                    <div className="admin-section-label" style={{ marginBottom: 8 }}>👁 Page Views</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, textAlign: "center" }}>
-                      <div className="stats-box"><div className="stats-num">{stats.pageViews.today}</div><div className="stats-label">Today</div></div>
-                      <div className="stats-box"><div className="stats-num">{stats.pageViews.thisWeek}</div><div className="stats-label">This Week</div></div>
-                      <div className="stats-box"><div className="stats-num">{stats.pageViews.total}</div><div className="stats-label">All Time</div></div>
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="admin-card" style={{ marginBottom: 12 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, textAlign: "center" }}>
-                      <div className="stats-box"><div className="stats-num">{stats.activeUsersThisWeek}</div><div className="stats-label">Active Users (Week)</div></div>
-                      <div className="stats-box"><div className="stats-num">{stats.totalEvents}</div><div className="stats-label">Total Events</div></div>
-                    </div>
-                  </div>
-
-                  {/* Top Episodes */}
-                  {stats.topEpisodes.length > 0 && (
-                    <div className="admin-card" style={{ marginBottom: 12 }}>
-                      <div className="admin-section-label" style={{ marginBottom: 8 }}>🔥 Most Opened Episodes (30 days)</div>
-                      <div className="admin-episode-list" style={{ maxHeight: 200 }}>
-                        {stats.topEpisodes.map((ep, i) => (
-                          <div key={ep.id} className="admin-ep-row">
-                            <div className="admin-ep-info">
-                              <span className="admin-ep-emoji" style={{ fontSize: 14, width: 20 }}>{i + 1}.</span>
-                              <div><div className="admin-ep-name">{ep.title}</div></div>
-                            </div>
-                            <span style={{ fontSize: 12, color: "var(--accent-teal)", fontFamily: "var(--font-mono)" }}>{ep.clicks} clicks</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Top Favourites */}
-                  {stats.topFavourites.length > 0 && (
-                    <div className="admin-card">
-                      <div className="admin-section-label" style={{ marginBottom: 8 }}>❤️ Most Saved (30 days)</div>
-                      <div className="admin-episode-list" style={{ maxHeight: 200 }}>
-                        {stats.topFavourites.map((f, i) => (
-                          <div key={f.id} className="admin-ep-row">
-                            <div className="admin-ep-info">
-                              <span className="admin-ep-emoji" style={{ fontSize: 14, width: 20 }}>{i + 1}.</span>
-                              <div><div className="admin-ep-name">{f.name}</div></div>
-                            </div>
-                            <span style={{ fontSize: 12, color: "var(--accent2)", fontFamily: "var(--font-mono)" }}>{f.saves} saves</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {stats.topEpisodes.length === 0 && stats.topFavourites.length === 0 && (
-                    <p className="admin-hint" style={{ textAlign: "center", padding: 16 }}>No interaction data yet. Stats will appear as users browse the site.</p>
-                  )}
-                </>
-              ) : (
-                <p className="admin-hint">No stats available.</p>
-              )}
-            </div>
-          )}
         </div>
       </aside>
     </>
@@ -1274,6 +1190,7 @@ export default function Home() {
       {/* Stats + Deck bar */}
       <div className="status-bar"><div className="status-bar-inner">
         {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
+        {adminToken && <a href="/stats" className="deck-page-btn" style={{ background: "rgba(155,89,182,0.08)", borderColor: "rgba(155,89,182,0.25)", color: "#a855f7" }}>📊 Stats</a>}
       </div></div>
 
       {/* Controls */}
