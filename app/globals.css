@@ -2390,3 +2390,37 @@ select.edit-input { cursor: pointer; }
   background: rgba(255,214,10,0.15);
   border-color: var(--accent-yellow);
 }
+
+/* ===== CATEGORY TABS ===== */
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.category-tab {
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.category-tab:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(255,45,85,0.05);
+}
+
+.category-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}

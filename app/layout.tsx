@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "patternspeakout — Idiom of the Day 📚",
+  title: "patternspeakout",
   description:
     "สรุป Idiom of the Day จากช่อง @patternspeakout บน TikTok พร้อมระดับ CEFR, คำจำกัดความภาษาไทย–อังกฤษ, คำพ้อง, คำตรงข้าม และตัวอย่างประโยค",
 };

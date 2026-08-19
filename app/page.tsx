@@ -923,6 +923,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
   const [cefrFilter, setCefrFilter] = useState("all");
+  const [category, setCategory] = useState("all");
   const [selectedVideo, setSelectedVideo] = useState<{ video: Video; index: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
   const [adminOpen, setAdminOpen] = useState(false);
@@ -956,6 +957,16 @@ export default function Home() {
   // Filter & sort
   useEffect(() => {
     let result = [...videos];
+    // Category filter
+    if (category !== "all") {
+      result = result.filter(v => {
+        const data = getIdiomData(v);
+        const cat = (data as Record<string, unknown>)?.category as string | undefined;
+        // Default category for existing idioms is "idiom"
+        const itemCat = cat || "idiom";
+        return itemCat === category;
+      });
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(v => {
@@ -975,7 +986,7 @@ export default function Home() {
       case "cefr": { const o: Record<string, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 }; result.sort((a, b) => (o[getIdiomData(a)?.cefr ?? "B1"] ?? 3) - (o[getIdiomData(b)?.cefr ?? "B1"] ?? 3)); break; }
     }
     setFiltered(result);
-  }, [videos, search, sort, cefrFilter]);
+  }, [videos, search, sort, cefrFilter, category]);
 
   // Particles
   const particlesRef = useRef<HTMLDivElement>(null);
@@ -989,9 +1000,9 @@ export default function Home() {
       {/* HERO */}
       <header className="hero">
         <div className="particles" ref={particlesRef} aria-hidden="true" />
-        <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout &nbsp;·&nbsp; Idiom of the Day</a>
-        <h1><span className="gradient-text">Idiom of the Day</span></h1>
-        <p className="subtitle">สรุปทุก Episode จาก TikTok <strong>@patternspeakout</strong> — เรียนรู้ Idiom ภาษาอังกฤษพร้อมระดับ CEFR, ความหมายไทย–อังกฤษ, Synonyms, Antonyms และตัวอย่างประโยค</p>
+        <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout</a>
+        <h1><span className="gradient-text">Pattern SpeakOut</span></h1>
+        <p className="subtitle">เรียนรู้ภาษาอังกฤษจาก TikTok <strong>@patternspeakout</strong> — Idiom, วิธีพูด, และแรงบันดาลใจ พร้อม CEFR, ความหมายไทย–อังกฤษ และตัวอย่างประโยค</p>
         <div className="hero-stats">
           <div className="stat-item"><div className="stat-number">{loading ? "…" : videos.length}</div><div className="stat-label">Episodes</div></div>
           <div className="stat-item"><div className="stat-number">A1–C2</div><div className="stat-label">CEFR Levels</div></div>
@@ -1066,9 +1077,17 @@ export default function Home() {
 
       {/* Main */}
       <main className="main-content">
+        {/* Category tabs */}
+        <div className="category-tabs">
+          <button className={`category-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>📚 All</button>
+          <button className={`category-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>🎯 Idiom of the Day</button>
+          <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>🗣️ How to Say</button>
+          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>💪 Motto Motivation</button>
+        </div>
+
         <div className="section-header">
-          <h2 className="section-title"><span className="dot" aria-hidden="true" />All Episodes</h2>
-          <div className="result-count" aria-live="polite">{loading ? "กำลังโหลด…" : `${filtered.length} idiom${filtered.length !== 1 ? "s" : ""}`}</div>
+          <h2 className="section-title"><span className="dot" aria-hidden="true" />{category === "all" ? "All Episodes" : category === "idiom" ? "Idiom of the Day" : category === "howtosay" ? "How to Say" : "Motto Motivation"}</h2>
+          <div className="result-count" aria-live="polite">{loading ? "กำลังโหลด…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}</div>
         </div>
         <div className="idiom-grid" role="list">
           {loading && <SkeletonGrid />}
