@@ -1006,13 +1006,14 @@ export default function Home() {
 
       <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)}
         onAuth={(t, role) => {
-          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); }
+          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); }
           else if (role === "user" && t) {
             setAdminToken("");
             // Fetch user info from token (user UUID)
             fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); if (d.words) setSavedWords(d.words); });
             setUserSession({ id: t, email: "", displayName: "User", role: "user" });
-          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]); }
+            sessionStorage.setItem("deck_userId", t);
+          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]); sessionStorage.removeItem("deck_userId"); }
         }}
         userSession={userSession} adminToken={adminToken} videos={videos} favourites={favourites} savedWords={savedWords}
         onToggleFav={async (tiktokId) => {
@@ -1034,7 +1035,10 @@ export default function Home() {
       />
 
       {/* Status */}
-      <div className="status-bar"><div className="status-bar-inner"><div className="last-updated"><span className="live-dot" /><span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span></div></div></div>
+      <div className="status-bar"><div className="status-bar-inner">
+        <div className="last-updated"><span className="live-dot" /><span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span></div>
+        {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
+      </div></div>
 
       {/* Controls */}
       <nav className="controls-bar" aria-label="Filter and search">

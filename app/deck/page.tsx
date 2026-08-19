@@ -155,13 +155,8 @@ export default function DeckPage() {
           <h1 className="deck-title">💾 My Deck</h1>
         </div>
         <div className="deck-login-box">
-          <p style={{ marginBottom: 16, color: "var(--text-secondary)" }}>Sign in to view your saved vocabulary deck.</p>
-          <form onSubmit={handleLogin} className="admin-login-form" style={{ maxWidth: 320 }}>
-            <div className="admin-field"><label className="admin-label">Email</label><input className="admin-input" type="text" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required autoFocus /></div>
-            <div className="admin-field"><label className="admin-label">Password</label><input className="admin-input" type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} required /></div>
-            {loginError && <div className="admin-error">{loginError}</div>}
-            <button className="admin-login-btn" type="submit" disabled={loginLoading}>{loginLoading ? "Signing in…" : "🔓 Sign in"}</button>
-          </form>
+          <p style={{ marginBottom: 16, color: "var(--text-secondary)" }}>Please sign in from the main page first to access your deck.</p>
+          <Link href="/" className="deck-flashcard-btn" style={{ textDecoration: "none" }}>← Go to main page &amp; sign in</Link>
         </div>
       </div>
     );

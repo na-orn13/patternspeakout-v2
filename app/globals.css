@@ -2368,3 +2368,25 @@ select.edit-input { cursor: pointer; }
   .flashcard { height: 240px; }
   .flashcard-word { font-size: 22px; }
 }
+
+/* ===== DECK BUTTON ON MAIN PAGE ===== */
+.deck-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: rgba(255,214,10,0.08);
+  border: 1px solid rgba(255,214,10,0.25);
+  border-radius: 100px;
+  color: var(--accent-yellow);
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.deck-page-btn:hover {
+  background: rgba(255,214,10,0.15);
+  border-color: var(--accent-yellow);
+}
