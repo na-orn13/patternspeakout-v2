@@ -131,46 +131,260 @@ function Toast({ msg, type }: { msg: string; type: "success" | "error" | "" }) {
 }
 
 // ─── Video Card ───────────────────────────────────────────────────────────────
-function VideoCard({ video, index, onClick }: { video: Video; index: number; onClick: () => void }) {
+function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete }: {
+  video: Video; index: number; onClick: () => void;
+  isAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
+}) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
   const epNum = data?.episode ?? `EP.${String(index + 1).padStart(3, "0")}`;
 
   return (
-    <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s` }}
-      onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClick()}
-      aria-label={`เปิดรายละเอียด: ${data?.idiom ?? video.title}`}>
+    <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s` }}>
       <div className="card-accent-line" style={{ background: color }} />
-      <div className="card-header">
-        <div className="card-emoji" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>{emoji}</div>
-        <div className="card-meta">
-          <div className="card-episode">{epNum}</div>
-          <div className="card-idiom-title">{data?.idiom ?? video.title}</div>
-          <div className="card-tags">
-            {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
-            {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
-            {!data && <span className="tag tag-pos">TikTok</span>}
+
+      {/* Admin overlay buttons */}
+      {isAdmin && (
+        <div className="card-admin-btns">
+          <button className="card-admin-btn edit" onClick={(e) => { e.stopPropagation(); onEdit?.(); }} title="Edit">✏️</button>
+          <button className="card-admin-btn delete" onClick={(e) => { e.stopPropagation(); onDelete?.(); }} title="Delete">🗑️</button>
+        </div>
+      )}
+
+      <div className="card-clickable" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClick()}
+        aria-label={`เปิดรายละเอียด: ${data?.idiom ?? video.title}`}>
+        <div className="card-header">
+          <div className="card-emoji" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>{emoji}</div>
+          <div className="card-meta">
+            <div className="card-episode">{epNum}</div>
+            <div className="card-idiom-title">{data?.idiom ?? video.title}</div>
+            <div className="card-tags">
+              {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
+              {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
+              {!data && <span className="tag tag-pos">TikTok</span>}
+            </div>
+          </div>
+        </div>
+        <div className="card-body">
+          {data ? (
+            <>
+              <div className="card-flag">🇬🇧 English</div>
+              <div className="card-def-en">{data.definitionEN}</div>
+              <div className="card-flag" style={{ marginTop: 10 }}>🇹🇭 ภาษาไทย</div>
+              <div className="card-def-th">{data.definitionTH}</div>
+            </>
+          ) : (
+            <div className="card-def-en">{video.caption.slice(0, 160)}{video.caption.length > 160 ? "…" : ""}</div>
+          )}
+        </div>
+        <div className="card-footer">
+          <div className="card-date">{fmtDate(video.published_at)}</div>
+          <div className="card-expand-btn">
+            ดูรายละเอียด
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </div>
         </div>
       </div>
-      <div className="card-body">
-        {data ? (
-          <>
-            <div className="card-flag">🇬🇧 English</div>
-            <div className="card-def-en">{data.definitionEN}</div>
-            <div className="card-flag" style={{ marginTop: 10 }}>🇹🇭 ภาษาไทย</div>
-            <div className="card-def-th">{data.definitionTH}</div>
-          </>
-        ) : (
-          <div className="card-def-en">{video.caption.slice(0, 160)}{video.caption.length > 160 ? "…" : ""}</div>
-        )}
-      </div>
-      <div className="card-footer">
-        <div className="card-date">{fmtDate(video.published_at)}</div>
-        <div className="card-expand-btn">
-          ดูรายละเอียด
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </div>
+  );
+}
+
+// ─── Edit Modal (Low-code friendly form) ──────────────────────────────────────
+function EditModal({ video, token, onClose, onSaved, onToast }: {
+  video: Video; token: string; onClose: () => void; onSaved: () => void; onToast: (m: string, t: "success"|"error") => void;
+}) {
+  const data = getIdiomData(video);
+  const [idiom, setIdiom] = useState(data?.idiom ?? "");
+  const [cefr, setCefr] = useState(data?.cefr ?? "B1");
+  const [partOfSpeech, setPartOfSpeech] = useState(data?.partOfSpeech ?? "verb phrase");
+  const [episode, setEpisode] = useState(data?.episode ?? "");
+  const [date, setDate] = useState(data?.date ?? "");
+  const [thumbnail, setThumbnail] = useState(data?.thumbnail ?? "");
+  const [color, setColor] = useState(data?.color ?? "#FF6B6B");
+  const [defEN, setDefEN] = useState(data?.definitionEN ?? "");
+  const [defTH, setDefTH] = useState(data?.definitionTH ?? "");
+  const [synonyms, setSynonyms] = useState((data?.synonyms ?? []).join(", "));
+  const [antonyms, setAntonyms] = useState((data?.antonyms ?? []).join(", "));
+  const [usage, setUsage] = useState(data?.usage ?? "");
+  const [context, setContext] = useState(data?.context ?? "");
+  const [examples, setExamples] = useState<Array<{en: string; th: string}>>(data?.examples ?? [{ en: "", th: "" }]);
+  const [keyWords, setKeyWords] = useState<Array<{word:string;cefr:string;pos:string;definitionEN:string;definitionTH:string;synonyms:string;antonyms:string}>>(
+    (data?.keyWords ?? []).map(kw => ({ ...kw, synonyms: kw.synonyms.join(", "), antonyms: kw.antonyms.join(", ") }))
+  );
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+
+  const handleSave = async () => {
+    if (!idiom.trim() || !defEN.trim()) { onToast("Idiom name and English definition are required.", "error"); return; }
+    setSaving(true);
+    const body = {
+      tiktokId: video.tiktok_id,
+      data: {
+        idiom: idiom.trim(),
+        cefr, partOfSpeech,
+        episode: episode.trim() || undefined,
+        date: date.trim() || undefined,
+        thumbnail: thumbnail.trim() || undefined,
+        color: color.trim() || undefined,
+        definitionEN: defEN.trim(),
+        definitionTH: defTH.trim(),
+        synonyms: synonyms.split(",").map(s => s.trim()).filter(Boolean),
+        antonyms: antonyms.split(",").map(s => s.trim()).filter(Boolean),
+        keyWords: keyWords.map(kw => ({
+          word: kw.word, cefr: kw.cefr, pos: kw.pos,
+          definitionEN: kw.definitionEN, definitionTH: kw.definitionTH,
+          synonyms: kw.synonyms.split(",").map(s => s.trim()).filter(Boolean),
+          antonyms: kw.antonyms.split(",").map(s => s.trim()).filter(Boolean),
+        })),
+        examples: examples.filter(ex => ex.en.trim()),
+        usage: usage.trim(), context: context.trim(),
+      },
+    };
+    try {
+      const res = await fetch("/api/idioms/edit", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = await res.json();
+      if (!res.ok) { onToast(`Save failed: ${result.error}`, "error"); return; }
+      onToast(`✅ "${idiom}" saved!`, "success");
+      onSaved(); onClose();
+    } catch { onToast("Network error.", "error"); }
+    finally { setSaving(false); }
+  };
+
+  const addExample = () => setExamples([...examples, { en: "", th: "" }]);
+  const removeExample = (i: number) => setExamples(examples.filter((_, j) => j !== i));
+  const updateExample = (i: number, field: "en"|"th", val: string) => { const copy = [...examples]; copy[i] = { ...copy[i], [field]: val }; setExamples(copy); };
+
+  const addKeyWord = () => setKeyWords([...keyWords, { word: "", cefr: "A1", pos: "noun", definitionEN: "", definitionTH: "", synonyms: "", antonyms: "" }]);
+  const removeKeyWord = (i: number) => setKeyWords(keyWords.filter((_, j) => j !== i));
+  const updateKeyWord = (i: number, field: string, val: string) => { const copy = [...keyWords]; copy[i] = { ...copy[i], [field]: val }; setKeyWords(copy); };
+
+  return (
+    <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+      <div className="modal" style={{ maxWidth: 680 }}>
+        <button className="modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        <div className="modal-hero" style={{ padding: "24px 32px", background: "var(--bg-card2)" }}>
+          <div className="modal-idiom-name" style={{ fontSize: 20 }}>✏️ Edit: {idiom || "New Idiom"}</div>
+        </div>
+        <div className="modal-body" style={{ padding: "24px 32px", gap: 20, maxHeight: "70vh", overflowY: "auto" }}>
+
+          {/* Basic info */}
+          <div className="edit-row">
+            <div className="edit-field" style={{ flex: 2 }}>
+              <label className="edit-label">Idiom Name *</label>
+              <input className="edit-input" value={idiom} onChange={e => setIdiom(e.target.value)} placeholder="Hit the nail on the head" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">CEFR</label>
+              <select className="edit-input" value={cefr} onChange={e => setCefr(e.target.value)}>
+                <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="edit-row">
+            <div className="edit-field">
+              <label className="edit-label">Part of Speech</label>
+              <input className="edit-input" value={partOfSpeech} onChange={e => setPartOfSpeech(e.target.value)} placeholder="verb phrase" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Episode</label>
+              <input className="edit-input" value={episode} onChange={e => setEpisode(e.target.value)} placeholder="EP.001" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Date</label>
+              <input className="edit-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="edit-row">
+            <div className="edit-field">
+              <label className="edit-label">Emoji</label>
+              <input className="edit-input" value={thumbnail} onChange={e => setThumbnail(e.target.value)} placeholder="🎯" style={{ fontSize: 20, textAlign: "center" }} />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Color</label>
+              <input className="edit-input" type="color" value={color} onChange={e => setColor(e.target.value)} style={{ height: 38, padding: 2 }} />
+            </div>
+            <div className="edit-field" style={{ flex: 2 }}>
+              <label className="edit-label">Usage</label>
+              <input className="edit-input" value={usage} onChange={e => setUsage(e.target.value)} placeholder="Formal & Informal" />
+            </div>
+          </div>
+
+          {/* Definitions */}
+          <div className="edit-field">
+            <label className="edit-label">🇬🇧 Definition (English) *</label>
+            <textarea className="edit-input" rows={2} value={defEN} onChange={e => setDefEN(e.target.value)} placeholder="To be precisely correct about something." />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label">🇹🇭 ความหมาย (ไทย)</label>
+            <textarea className="edit-input" rows={2} value={defTH} onChange={e => setDefTH(e.target.value)} placeholder="พูดถูกต้องแม่นยำ / ตรงประเด็น" />
+          </div>
+
+          {/* Synonyms / Antonyms / Context */}
+          <div className="edit-field">
+            <label className="edit-label">Synonyms (comma-separated)</label>
+            <input className="edit-input" value={synonyms} onChange={e => setSynonyms(e.target.value)} placeholder="be spot on, be exactly right, be dead right" />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label">Antonyms (comma-separated)</label>
+            <input className="edit-input" value={antonyms} onChange={e => setAntonyms(e.target.value)} placeholder="miss the point, be off the mark" />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label">Context</label>
+            <input className="edit-input" value={context} onChange={e => setContext(e.target.value)} placeholder="Work, discussion, debate" />
+          </div>
+
+          {/* Examples */}
+          <div>
+            <div className="edit-label" style={{ marginBottom: 8 }}>✍️ Example Sentences</div>
+            {examples.map((ex, i) => (
+              <div key={i} className="edit-example-row">
+                <div className="edit-example-num">{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <input className="edit-input" value={ex.en} onChange={e => updateExample(i, "en", e.target.value)} placeholder="English sentence…" style={{ marginBottom: 4 }} />
+                  <input className="edit-input" value={ex.th} onChange={e => updateExample(i, "th", e.target.value)} placeholder="คำแปลภาษาไทย…" />
+                </div>
+                <button className="edit-remove-btn" onClick={() => removeExample(i)} title="Remove">✕</button>
+              </div>
+            ))}
+            <button className="edit-add-btn" onClick={addExample}>+ Add example</button>
+          </div>
+
+          {/* Key Words */}
+          <div>
+            <div className="edit-label" style={{ marginBottom: 8 }}>🔑 Key Words</div>
+            {keyWords.map((kw, i) => (
+              <div key={i} className="edit-keyword-block">
+                <div className="edit-row">
+                  <div className="edit-field"><input className="edit-input" value={kw.word} onChange={e => updateKeyWord(i, "word", e.target.value)} placeholder="Word" /></div>
+                  <div className="edit-field">
+                    <select className="edit-input" value={kw.cefr} onChange={e => updateKeyWord(i, "cefr", e.target.value)}>
+                      <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option>
+                    </select>
+                  </div>
+                  <div className="edit-field"><input className="edit-input" value={kw.pos} onChange={e => updateKeyWord(i, "pos", e.target.value)} placeholder="noun" /></div>
+                  <button className="edit-remove-btn" onClick={() => removeKeyWord(i)} title="Remove">✕</button>
+                </div>
+                <input className="edit-input" value={kw.definitionEN} onChange={e => updateKeyWord(i, "definitionEN", e.target.value)} placeholder="🇬🇧 Definition" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={kw.definitionTH} onChange={e => updateKeyWord(i, "definitionTH", e.target.value)} placeholder="🇹🇭 ความหมาย" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={kw.synonyms} onChange={e => updateKeyWord(i, "synonyms", e.target.value)} placeholder="Synonyms (comma)" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={kw.antonyms} onChange={e => updateKeyWord(i, "antonyms", e.target.value)} placeholder="Antonyms (comma)" />
+              </div>
+            ))}
+            <button className="edit-add-btn" onClick={addKeyWord}>+ Add key word</button>
+          </div>
+
+          {/* Save */}
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button className="admin-login-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>
+              {saving ? <><span className="spin">↻</span> Saving…</> : <>💾 Save Changes</>}
+            </button>
+            <button className="admin-action-btn" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }} onClick={onClose}>Cancel</button>
+          </div>
         </div>
       </div>
     </div>
@@ -331,9 +545,9 @@ function DetailModal({ video, index, onClose }: { video: Video; index: number; o
 }
 
 // ─── Admin Panel ──────────────────────────────────────────────────────────────
-interface AdminPanelProps { open: boolean; onClose: () => void; onToast: (msg: string, type: "success" | "error") => void; onRefresh: () => void; }
+interface AdminPanelProps { open: boolean; onClose: () => void; onToast: (msg: string, type: "success" | "error") => void; onRefresh: () => void; onAuth: (token: string) => void; }
 
-function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
+function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelProps) {
   const [authed, setAuthed] = useState(false);
   const [token, setToken] = useState("");
   const [loginUser, setLoginUser] = useState("");
@@ -376,12 +590,12 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
       const res = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: loginUser, password: loginPass }) });
       const data = await res.json();
       if (!res.ok) { setLoginError(data.error || "Login failed."); return; }
-      setToken(data.token); setAuthed(true); setLoginPass("");
+      setToken(data.token); setAuthed(true); setLoginPass(""); onAuth(data.token);
     } catch { setLoginError("Network error."); }
     finally { setLoginLoading(false); }
   };
 
-  const handleLogout = () => { setAuthed(false); setToken(""); setLoginUser(""); setLoginPass(""); setLoginError(""); setUploadResult(null); setJsonText(""); setEditingEp(null); };
+  const handleLogout = () => { setAuthed(false); setToken(""); setLoginUser(""); setLoginPass(""); setLoginError(""); setUploadResult(null); setJsonText(""); setEditingEp(null); onAuth(""); };
 
   const handleDelete = async (tiktokId: string, name: string) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
@@ -609,6 +823,8 @@ export default function Home() {
   const [selectedVideo, setSelectedVideo] = useState<{ video: Video; index: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
   const [adminOpen, setAdminOpen] = useState(false);
+  const [adminToken, setAdminToken] = useState("");
+  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -683,7 +899,7 @@ export default function Home() {
         <span className="hamburger-line" /><span className="hamburger-line" /><span className="hamburger-line" />
       </button>
 
-      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} />
+      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} onAuth={(t) => setAdminToken(t)} />
 
       {/* Status */}
       <div className="status-bar"><div className="status-bar-inner"><div className="last-updated"><span className="live-dot" /><span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span></div></div></div>
@@ -726,7 +942,23 @@ export default function Home() {
             <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มี Idiom"}</h3><p>{search ? "ลองค้นหาด้วยคำอื่น" : "เปิด Admin Panel (☰) แล้วเพิ่ม Idiom ใหม่"}</p></div>
           )}
           {!loading && !error && filtered.map((video, i) => (
-            <VideoCard key={video.id} video={video} index={i} onClick={() => setSelectedVideo({ video, index: i })} />
+            <VideoCard key={video.id} video={video} index={i}
+              onClick={() => setSelectedVideo({ video, index: i })}
+              isAdmin={!!adminToken}
+              onEdit={() => setEditingVideo(video)}
+              onDelete={async () => {
+                const data = getIdiomData(video);
+                const name = data?.idiom ?? video.title;
+                if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+                try {
+                  const res = await fetch("/api/idioms/delete", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId: video.tiktok_id }) });
+                  const r = await res.json();
+                  if (!res.ok) { showToast(`Delete failed: ${r.error}`, "error"); return; }
+                  showToast(`🗑️ Deleted "${r.deleted}"`, "success");
+                  fetchVideos(true);
+                } catch { showToast("Network error.", "error"); }
+              }}
+            />
           ))}
         </div>
       </main>
@@ -742,6 +974,7 @@ export default function Home() {
 
       <button id="backToTop" className={showTop ? "visible" : ""} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">↑</button>
       {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} onClose={() => setSelectedVideo(null)} />}
+      {editingVideo && <EditModal video={editingVideo} token={adminToken} onClose={() => setEditingVideo(null)} onSaved={() => fetchVideos(true)} onToast={showToast} />}
       <Toast msg={toast.msg} type={toast.type} />
     </>
   );
