@@ -4,8 +4,7 @@ import { summariseFromCaption } from "@/lib/summarise";
 import { SEED_VIDEOS, type VideoRow } from "@/lib/seedData";
 
 export const runtime = "nodejs";
-// Sync can take up to 60 s (OpenAI calls per video)
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * POST /api/sync
@@ -110,8 +109,28 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Always update stats for ALL existing videos ───────────────────────
-    // (stats like view_count change over time)
+    // Also regenerate summaries for any that still have the fallback text
     const existingCandidates = candidates.filter((v) => existingIds.has(v.tiktok_id));
+
+    // Fetch existing rows that still have fallback summaries so we can upgrade them
+    const { data: staleRows } = await supabase
+      .from("videos")
+      .select("tiktok_id, caption, title, summary")
+      .in("tiktok_id", existingCandidates.map((v) => v.tiktok_id))
+      .like("summary", "⚠️ Caption-based summary (AI unavailable)%");
+
+    let regenerated = 0;
+    for (const row of staleRows ?? []) {
+      const result = await summariseFromCaption(row.caption, row.title);
+      if (result) {
+        await supabase
+          .from("videos")
+          .update({ summary: result.summary, summary_source: result.source, synced_at: new Date().toISOString() })
+          .eq("tiktok_id", row.tiktok_id);
+        regenerated++;
+      }
+    }
+
     for (const video of existingCandidates) {
       await supabase
         .from("videos")
@@ -130,6 +149,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       newVideos: inserted,
       updatedStats: existingCandidates.length,
+      regeneratedSummaries: regenerated,
       source: tiktokToken ? "tiktok_api" : "seed",
     });
   } catch (err: unknown) {
