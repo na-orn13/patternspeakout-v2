@@ -364,7 +364,13 @@ function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
       const data = await res.json();
       if (res.status === 401) { onToast("Session expired — please log in again.", "error"); handleLogout(); return; }
       if (!res.ok) { onToast(`Sync failed: ${data.detail ?? data.error}`, "error"); return; }
-      onToast(`✅ Sync complete — ${data.newVideos} new video${data.newVideos !== 1 ? "s" : ""} added`, "success");
+
+      const remaining = data.remainingStale ?? 0;
+      if (remaining > 0) {
+        onToast(`↻ ${data.regeneratedSummaries} summaries done — ${remaining} remaining, click Sync again`, "success");
+      } else {
+        onToast(`✅ Sync complete — ${data.newVideos} new, ${data.regeneratedSummaries ?? 0} summaries generated`, "success");
+      }
       onRefresh();
     } catch { onToast("Network error during sync.", "error"); }
     finally { setSyncing(false); }

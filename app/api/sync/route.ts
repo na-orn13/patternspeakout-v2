@@ -120,7 +120,11 @@ export async function POST(req: NextRequest) {
       .like("summary", "⚠️ Caption-based summary (AI unavailable)%");
 
     let regenerated = 0;
-    for (const row of staleRows ?? []) {
+    // Process in batches of 3 to stay within function timeout
+    const BATCH = 3;
+    const stale = staleRows ?? [];
+    for (let i = 0; i < stale.length && i < BATCH; i++) {
+      const row = stale[i];
       const result = await summariseFromCaption(row.caption, row.title);
       if (result) {
         await supabase
@@ -130,6 +134,7 @@ export async function POST(req: NextRequest) {
         regenerated++;
       }
     }
+    const remaining = Math.max(0, stale.length - BATCH);
 
     for (const video of existingCandidates) {
       await supabase
@@ -150,6 +155,7 @@ export async function POST(req: NextRequest) {
       newVideos: inserted,
       updatedStats: existingCandidates.length,
       regeneratedSummaries: regenerated,
+      remainingStale: remaining,
       source: tiktokToken ? "tiktok_api" : "seed",
     });
   } catch (err: unknown) {
