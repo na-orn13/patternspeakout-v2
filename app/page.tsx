@@ -576,6 +576,8 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   const [regEmail, setRegEmail] = useState("");
   const [regPass, setRegPass] = useState("");
   const [regName, setRegName] = useState("");
+  const [regAge, setRegAge] = useState("");
+  const [regPhone, setRegPhone] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [regResult, setRegResult] = useState<string|null>(null);
   // Admin: add idiom
@@ -583,7 +585,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<string|null>(null);
   // Admin: user management
-  const [users, setUsers] = useState<Array<{id:string;email:string;display_name:string;role:string;status:string;expires_at:string|null;created_at:string}>>([]);
+  const [users, setUsers] = useState<Array<{id:string;email:string;display_name:string;full_name:string;age:number|null;phone:string;role:string;status:string;expires_at:string|null;created_at:string}>>([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [open, onClose]);
@@ -622,11 +624,11 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); setRegLoading(true); setRegResult(null);
     try {
-      const res = await fetch("/api/users/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: regEmail, password: regPass, displayName: regName }) });
+      const res = await fetch("/api/users/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: regEmail, password: regPass, displayName: regName, fullName: regName, age: parseInt(regAge) || 0, phone: regPhone }) });
       const data = await res.json();
       if (!res.ok) { setRegResult(`❌ ${data.error}`); return; }
       setRegResult(`✅ ${data.message}`);
-      setRegEmail(""); setRegPass(""); setRegName("");
+      setRegEmail(""); setRegPass(""); setRegName(""); setRegAge(""); setRegPhone("");
     } catch { setRegResult("❌ Network error."); }
     finally { setRegLoading(false); }
   };
@@ -729,9 +731,11 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
 
               {tab === "register" && (
                 <form className="admin-login-form" onSubmit={handleRegister}>
-                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-name">Display Name</label><input id="sp-reg-name" className="admin-input" value={regName} onChange={e => setRegName(e.target.value)} placeholder="Your name" /></div>
-                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-email">Email</label><input id="sp-reg-email" className="admin-input" type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} required placeholder="you@email.com" /></div>
-                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-pass">Password (min 6 chars)</label><input id="sp-reg-pass" className="admin-input" type="password" value={regPass} onChange={e => setRegPass(e.target.value)} required minLength={6} /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-name">Full Name *</label><input id="sp-reg-name" className="admin-input" value={regName} onChange={e => setRegName(e.target.value)} placeholder="Your full name" required /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-age">Age *</label><input id="sp-reg-age" className="admin-input" type="number" min="1" max="120" value={regAge} onChange={e => setRegAge(e.target.value)} placeholder="25" required /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-phone">Phone Number *</label><input id="sp-reg-phone" className="admin-input" type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="0812345678" required /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-email">Email *</label><input id="sp-reg-email" className="admin-input" type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} required placeholder="you@email.com" /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-pass">Password (min 6 chars) *</label><input id="sp-reg-pass" className="admin-input" type="password" value={regPass} onChange={e => setRegPass(e.target.value)} required minLength={6} /></div>
                   {regResult && <div className={`admin-result ${regResult.startsWith("✅") ? "ok" : "err"}`}>{regResult}</div>}
                   <button className="admin-login-btn" type="submit" disabled={regLoading}>{regLoading ? <><span className="spin">↻</span> Registering…</> : <>📝 Register</>}</button>
                   <p className="admin-hint" style={{ marginTop: 8 }}>After registering, admin must approve your account before you can sign in.</p>
@@ -812,8 +816,8 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                     <div key={u.id} className="admin-ep-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div className="admin-ep-name">{u.display_name || u.email}</div>
-                          <div className="admin-ep-meta">{u.email} · {u.role} · <span style={{ color: u.status === "approved" ? "var(--accent-teal)" : u.status === "pending" ? "var(--accent-yellow)" : "var(--accent2)" }}>{u.status}</span></div>
+                          <div className="admin-ep-name">{u.full_name || u.display_name || u.email}</div>
+                          <div className="admin-ep-meta">{u.email} · {u.phone ? `📱${u.phone}` : ""} · {u.age ? `${u.age}y` : ""} · <span style={{ color: u.status === "approved" ? "var(--accent-teal)" : u.status === "pending" ? "var(--accent-yellow)" : "var(--accent2)" }}>{u.status}</span></div>
                           {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("th-TH")}</div>}
                         </div>
                       </div>

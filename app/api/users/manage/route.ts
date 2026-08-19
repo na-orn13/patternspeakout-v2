@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("app_users")
-    .select("id, email, display_name, role, status, expires_at, created_at")
+    .select("id, email, display_name, full_name, age, phone, role, status, expires_at, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

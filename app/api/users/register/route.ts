@@ -11,11 +11,14 @@ export const runtime = "nodejs";
  * Sends notification email to admin.
  */
 export async function POST(req: NextRequest) {
-  let body: { email?: string; password?: string; displayName?: string };
+  let body: { email?: string; password?: string; displayName?: string; fullName?: string; age?: number; phone?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
-  const { email, password, displayName } = body;
+  const { email, password, displayName, fullName, age, phone } = body;
   if (!email || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  if (!fullName?.trim()) return NextResponse.json({ error: "Full name is required." }, { status: 400 });
+  if (!age || age < 1 || age > 120) return NextResponse.json({ error: "Valid age is required." }, { status: 400 });
+  if (!phone?.trim()) return NextResponse.json({ error: "Phone number is required." }, { status: 400 });
   if (password.length < 6) return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
 
   const emailLower = email.trim().toLowerCase();
@@ -35,7 +38,10 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from("app_users").insert({
     email: emailLower,
     password_hash: passwordHash,
-    display_name: displayName?.trim() || emailLower.split("@")[0],
+    display_name: displayName?.trim() || fullName?.trim() || emailLower.split("@")[0],
+    full_name: fullName?.trim() || "",
+    age: age || null,
+    phone: phone?.trim() || "",
     role: "user",
     status: "pending",
   });
@@ -43,14 +49,14 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: "Registration failed.", detail: error.message }, { status: 500 });
 
   // Send notification email to admin (non-blocking — don't fail registration if email fails)
-  sendAdminNotification(emailLower, displayName?.trim() || emailLower.split("@")[0]).catch(
+  sendAdminNotification(emailLower, fullName?.trim() || "", age || 0, phone?.trim() || "").catch(
     (err) => console.error("[register] Email notification failed:", err)
   );
 
   return NextResponse.json({ ok: true, message: "Account created! Please wait for admin approval before signing in." });
 }
 
-async function sendAdminNotification(userEmail: string, displayName: string) {
+async function sendAdminNotification(userEmail: string, fullName: string, age: number, phone: string) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
     console.warn("[register] RESEND_API_KEY not set — skipping email notification.");
@@ -68,14 +74,16 @@ async function sendAdminNotification(userEmail: string, displayName: string) {
     body: JSON.stringify({
       from: "Pattern Speak Out <onboarding@resend.dev>",
       to: ["sweetpimja@gmail.com"],
-      subject: `🆕 New Registration: ${displayName} (${userEmail})`,
+      subject: `🆕 New Registration: ${fullName} (${userEmail})`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; max-width: 500px;">
           <h2 style="color: #ff2d55;">🆕 New User Registration</h2>
           <p>A new user has registered on Pattern Speak Out and is waiting for your approval.</p>
           <table style="border-collapse: collapse; width: 100%; margin: 16px 0;">
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Name</td><td style="padding: 8px; border: 1px solid #ddd;">${displayName}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Full Name</td><td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td></tr>
             <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td><td style="padding: 8px; border: 1px solid #ddd;">${userEmail}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Age</td><td style="padding: 8px; border: 1px solid #ddd;">${age}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Phone</td><td style="padding: 8px; border: 1px solid #ddd;">${phone}</td></tr>
             <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td><td style="padding: 8px; border: 1px solid #ddd; color: #e67e22;">⏳ Pending Approval</td></tr>
             <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Registered</td><td style="padding: 8px; border: 1px solid #ddd;">${now}</td></tr>
           </table>
