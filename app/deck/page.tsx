@@ -280,11 +280,14 @@ export default function DeckPage() {
                 </div>
                 <div className="deck-word-def-en">🇬🇧 {w.data.definitionEN}</div>
                 <div className="deck-word-def-th">🇹🇭 {w.data.definitionTH}</div>
-                {w.data.synonyms && w.data.synonyms.length > 0 && (
-                  <div className="deck-word-extra">Syn: {w.data.synonyms.join(", ")}</div>
+                {"example" in (w.data as object) && (w.data as Record<string, string>).example && (
+                  <div className="deck-word-extra" style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>Ex: {(w.data as Record<string, string>).example}</div>
                 )}
-                {w.data.antonyms && w.data.antonyms.length > 0 && (
-                  <div className="deck-word-extra">Ant: {w.data.antonyms.join(", ")}</div>
+                {w.data.synonyms && (w.data.synonyms as string[]).length > 0 && (
+                  <div className="deck-word-extra">Syn: {(w.data.synonyms as string[]).join(", ")}</div>
+                )}
+                {w.data.antonyms && (w.data.antonyms as string[]).length > 0 && (
+                  <div className="deck-word-extra">Ant: {(w.data.antonyms as string[]).join(", ")}</div>
                 )}
               </div>
             ))}

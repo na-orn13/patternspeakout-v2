@@ -1078,6 +1078,23 @@ export default function Home() {
     setFiltered(result);
   }, [videos, search, sort, cefrFilter, category]);
 
+  // Compute episode numbers: oldest = EP.001 within each category
+  useEffect(() => {
+    const map = new Map<string, number>();
+    const grouped: Record<string, Video[]> = {};
+    for (const v of videos) {
+      const d = getIdiomData(v);
+      const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(v);
+    }
+    for (const cat of Object.keys(grouped)) {
+      grouped[cat].sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
+      grouped[cat].forEach((v, i) => map.set(v.tiktok_id, i + 1));
+    }
+    setEpMap(map);
+  }, [videos]);
+
   // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
   useEffect(() => {
     const map = new Map<string, number>();
