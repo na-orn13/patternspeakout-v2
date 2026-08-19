@@ -785,15 +785,20 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           {userSession && tab === "deck" && (
             <div>
               <div className="admin-section-label">💾 My Deck</div>
+              <p className="admin-hint" style={{ marginBottom: 16 }}>
+                ดูและทบทวนคำศัพท์ที่บันทึกไว้ในหน้า Deck — พร้อมโหมด Flashcard และแยกตาม CEFR
+              </p>
+              <a href="/deck" className="deck-flashcard-btn" style={{ textDecoration: "none", display: "inline-flex" }}>
+                🃏 Open My Deck
+              </a>
 
-              {/* Saved Idioms */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>❤️ Saved Idioms ({deckVideos.length})</div>
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Quick View — ❤️ Saved Idioms ({deckVideos.length})</div>
                 {deckVideos.length === 0 ? (
                   <p className="admin-hint">กด ❤️ บนการ์ดเพื่อบันทึก idiom</p>
                 ) : (
                   <div className="admin-episode-list">
-                    {deckVideos.map(v => {
+                    {deckVideos.slice(0, 5).map(v => {
                       const d = getIdiomData(v);
                       return (
                         <div key={v.tiktok_id} className="admin-ep-row">
@@ -801,41 +806,24 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                             <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
                             <div>
                               <div className="admin-ep-name">{d?.idiom ?? v.title}</div>
-                              <div className="admin-ep-meta">{d?.cefr ?? ""} · {d?.partOfSpeech ?? ""}</div>
+                              <div className="admin-ep-meta">{d?.cefr ?? ""}</div>
                             </div>
                           </div>
                           <button className="admin-ep-btn delete" onClick={() => onToggleFav(v.tiktok_id)} title="Remove">✕</button>
                         </div>
                       );
                     })}
+                    {deckVideos.length > 5 && <p className="admin-hint" style={{ textAlign: "center" }}>+{deckVideos.length - 5} more — open full deck to see all</p>}
                   </div>
                 )}
               </div>
 
-              {/* Saved Words */}
-              <div>
+              <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>📝 Saved Words ({savedWords.length})</div>
                 {savedWords.length === 0 ? (
-                  <p className="admin-hint">กดคำศัพท์ในรายละเอียด idiom เพื่อบันทึกลง deck</p>
+                  <p className="admin-hint">กดคำศัพท์ในรายละเอียด idiom เพื่อบันทึก</p>
                 ) : (
-                  <div className="admin-episode-list">
-                    {savedWords.map(w => {
-                      const wd = w.data as { word?: string; cefr?: string; definitionEN?: string; definitionTH?: string };
-                      return (
-                        <div key={w.id} className="admin-ep-row">
-                          <div className="admin-ep-info">
-                            <span className="admin-ep-emoji">📝</span>
-                            <div>
-                              <div className="admin-ep-name">{wd.word ?? w.id}</div>
-                              <div className="admin-ep-meta" style={{ color: "var(--accent-teal)" }}>{wd.cefr ?? ""} · {wd.definitionEN?.slice(0, 40) ?? ""}</div>
-                              <div className="admin-ep-meta" style={{ color: "var(--accent-yellow)" }}>{wd.definitionTH?.slice(0, 40) ?? ""}</div>
-                            </div>
-                          </div>
-                          <button className="admin-ep-btn delete" onClick={() => onRemoveWord(w.id)} title="Remove">✕</button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <p className="admin-hint">{savedWords.length} words saved — <a href="/deck" style={{ color: "var(--accent-teal)" }}>open deck</a> to review</p>
                 )}
               </div>
             </div>

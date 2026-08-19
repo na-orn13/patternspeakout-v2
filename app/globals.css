@@ -2140,3 +2140,231 @@ select.edit-input { cursor: pointer; }
   border-color: var(--border);
   background: transparent;
 }
+
+/* ===== DECK PAGE ===== */
+.deck-page {
+  min-height: 100vh;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  padding-bottom: 60px;
+}
+
+.deck-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: var(--bg-card);
+}
+
+.deck-back {
+  font-size: 13px;
+  color: var(--accent2);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,45,85,0.3);
+  border-radius: 100px;
+  background: rgba(255,45,85,0.08);
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.deck-back:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+.deck-title {
+  font-size: 22px;
+  font-weight: 800;
+  flex: 1;
+  background: linear-gradient(135deg, #f5f5f5, #ffd60a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.deck-stats { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+.deck-counter { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.deck-controls {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.deck-tabs { display: flex; gap: 4px; }
+
+.deck-cefr-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.deck-flashcard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, rgba(255,45,85,0.15), rgba(255,214,10,0.1));
+  border: 1px solid rgba(255,45,85,0.3);
+  border-radius: 100px;
+  color: var(--accent2);
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  align-self: flex-start;
+}
+
+.deck-flashcard-btn:hover:not(:disabled) { background: var(--accent); color: white; border-color: var(--accent); }
+.deck-flashcard-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.deck-section { padding: 20px 24px; }
+.deck-section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 14px; }
+
+.deck-word-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+.deck-word-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  transition: var(--transition);
+}
+
+.deck-word-card:hover { border-color: rgba(255,255,255,0.12); }
+
+.deck-word-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.deck-word-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+.deck-remove-btn {
+  margin-left: auto;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,45,85,0.3);
+  background: transparent;
+  color: var(--accent2);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.deck-remove-btn:hover { background: var(--accent); color: white; }
+
+.deck-word-def-en { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 4px; }
+.deck-word-def-th { font-size: 13px; color: var(--accent-yellow); line-height: 1.5; margin-bottom: 4px; opacity: 0.85; }
+.deck-word-extra { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+.deck-login-box { display: flex; flex-direction: column; align-items: center; padding: 60px 24px; }
+
+/* ===== FLASHCARD ===== */
+.flashcard-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 24px;
+  gap: 24px;
+}
+
+.flashcard {
+  width: 100%;
+  max-width: 420px;
+  height: 280px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.flashcard-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4,0,0.2,1);
+  transform-style: preserve-3d;
+}
+
+.flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+
+.flashcard-front, .flashcard-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.flashcard-front {
+  background: linear-gradient(135deg, var(--bg-card), var(--bg-card2));
+}
+
+.flashcard-back {
+  background: linear-gradient(135deg, var(--bg-card2), var(--bg-card));
+  transform: rotateY(180deg);
+  gap: 10px;
+}
+
+.flashcard-cefr {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.flashcard-word {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.flashcard-hint { font-size: 12px; color: var(--text-muted); margin-top: 16px; }
+.flashcard-pos { font-size: 12px; color: var(--accent-teal); font-style: italic; }
+.flashcard-def-en { font-size: 15px; color: var(--text-secondary); line-height: 1.5; }
+.flashcard-def-th { font-size: 15px; color: var(--accent-yellow); line-height: 1.5; }
+
+.flashcard-nav {
+  display: flex;
+  gap: 12px;
+}
+
+.flashcard-nav-btn {
+  padding: 10px 24px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.flashcard-nav-btn:hover:not(:disabled) { background: var(--bg-card2); border-color: var(--accent); }
+.flashcard-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .deck-header { padding: 16px; }
+  .deck-controls { padding: 12px 16px; }
+  .deck-section { padding: 16px; }
+  .deck-word-grid { grid-template-columns: 1fr; }
+  .flashcard { height: 240px; }
+  .flashcard-word { font-size: 22px; }
+}
