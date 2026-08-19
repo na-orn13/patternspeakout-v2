@@ -22,6 +22,7 @@ interface IdiomData {
   idiom: string;
   cefr: string;
   partOfSpeech: string;
+  category?: string;
   episode?: string;
   date?: string;
   thumbnail?: string;
@@ -140,7 +141,7 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
   const cefrColor = data?.cefr ? ({ A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" }[data.cefr] ?? color) : color;
-  const epNum = data?.episode ?? `EP.${String(index + 1).padStart(3, "0")}`;
+  const epNum = `EP.${String(index + 1).padStart(3, "0")}`;
 
   return (
     <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s`, borderColor: `${cefrColor}40` }}>
@@ -601,9 +602,10 @@ interface SidePanelProps {
   savedWords: Array<{ id: string; data: Record<string, unknown> }>;
   onToggleFav: (tiktokId: string) => void;
   onRemoveWord: (wordId: string) => void;
+  addCategory: string;
 }
 
-function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord }: SidePanelProps) {
+function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory }: SidePanelProps) {
   const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users">("login");
   // Login
   const [loginEmail, setLoginEmail] = useState("");
@@ -678,6 +680,8 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
     setUploading(true); setUploadResult(null);
     try {
       const parsed = JSON.parse(jsonText);
+      // Auto-inject category if not specified
+      if (!parsed.category) parsed.category = addCategory;
       const res = await fetch("/api/idioms/add", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify(parsed) });
       const data = await res.json();
       if (!res.ok) { setUploadResult(`❌ ${data.error}`); return; }
@@ -715,7 +719,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "idiom": "Hit the nail on the head",
   "cefr": "B2",
   "partOfSpeech": "verb phrase",
-  "episode": "EP.001",
+  "category": "${addCategory}",
   "date": "2024-01-08",
   "thumbnail": "🎯",
   "color": "#FF6B6B",
@@ -834,8 +838,8 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           {userSession?.role === "admin" && tab === "admin" && (
             <>
               <div className="admin-card">
-                <div className="admin-section-label">📝 เพิ่ม Idiom (Paste JSON)</div>
-                <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง</p>
+                <div className="admin-section-label">📝 เพิ่ม {addCategory === "idiom" ? "Idiom" : addCategory === "howtosay" ? "How to Say" : "Motto"} (Paste JSON)</div>
+                <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง — category: <strong>{addCategory}</strong> (จะถูกเพิ่มอัตโนมัติ)</p>
                 <form onSubmit={handleUpload}>
                   <div className="admin-field">
                     <textarea className="admin-input" style={{ minHeight: 600, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
@@ -924,6 +928,7 @@ export default function Home() {
   const [sort, setSort] = useState("newest");
   const [cefrFilter, setCefrFilter] = useState("all");
   const [category, setCategory] = useState("all");
+  const [addCategory, setAddCategory] = useState("idiom");
   const [selectedVideo, setSelectedVideo] = useState<{ video: Video; index: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
   const [adminOpen, setAdminOpen] = useState(false);
@@ -1044,6 +1049,7 @@ export default function Home() {
             setSavedWords(prev => prev.filter(w => w.id !== wordId));
           } catch { /* ignore */ }
         }}
+        addCategory={addCategory}
       />
 
       {/* Status */}
@@ -1081,8 +1087,11 @@ export default function Home() {
         <div className="category-tabs">
           <button className={`category-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>📚 All</button>
           <button className={`category-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>🎯 Idiom of the Day</button>
+          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕</button>}
           <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>🗣️ How to Say</button>
+          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕</button>}
           <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>💪 Motto Motivation</button>
+          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Motto">➕</button>}
         </div>
 
         <div className="section-header">
