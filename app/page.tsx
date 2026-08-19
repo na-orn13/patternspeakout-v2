@@ -131,9 +131,10 @@ function Toast({ msg, type }: { msg: string; type: "success" | "error" | "" }) {
 }
 
 // ─── Video Card ───────────────────────────────────────────────────────────────
-function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete }: {
+function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, onFav }: {
   video: Video; index: number; onClick: () => void;
   isAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
+  isFav?: boolean; onFav?: () => void;
 }) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
@@ -150,6 +151,13 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete }: {
           <button className="card-admin-btn edit" onClick={(e) => { e.stopPropagation(); onEdit?.(); }} title="Edit">✏️</button>
           <button className="card-admin-btn delete" onClick={(e) => { e.stopPropagation(); onDelete?.(); }} title="Delete">🗑️</button>
         </div>
+      )}
+
+      {/* Favourite button (visible for all logged-in users) */}
+      {onFav && (
+        <button className={`card-fav-btn ${isFav ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); onFav(); }} title={isFav ? "Remove from deck" : "Save to deck"} aria-label={isFav ? "Remove from deck" : "Save to deck"}>
+          {isFav ? "❤️" : "🤍"}
+        </button>
       )}
 
       <div className="card-clickable" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClick()}
@@ -544,124 +552,121 @@ function DetailModal({ video, index, onClose }: { video: Video; index: number; o
   );
 }
 
-// ─── Admin Panel ──────────────────────────────────────────────────────────────
-interface AdminPanelProps { open: boolean; onClose: () => void; onToast: (msg: string, type: "success" | "error") => void; onRefresh: () => void; onAuth: (token: string) => void; }
+// ─── Side Panel (Login/Register/Admin/Deck) ──────────────────────────────────
+interface SidePanelProps {
+  open: boolean; onClose: () => void;
+  onToast: (msg: string, type: "success"|"error") => void;
+  onRefresh: () => void;
+  onAuth: (token: string, role: "admin"|"user"|"") => void;
+  userSession: { id: string; email: string; displayName: string; role: "admin"|"user" } | null;
+  adminToken: string;
+  videos: Video[];
+  favourites: Set<string>;
+  onToggleFav: (tiktokId: string) => void;
+}
 
-function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelProps) {
-  const [authed, setAuthed] = useState(false);
-  const [token, setToken] = useState("");
-  const [loginUser, setLoginUser] = useState("");
+function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, onToggleFav }: SidePanelProps) {
+  const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users">("login");
+  // Login
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  // Register
+  const [regEmail, setRegEmail] = useState("");
+  const [regPass, setRegPass] = useState("");
+  const [regName, setRegName] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+  const [regResult, setRegResult] = useState<string|null>(null);
+  // Admin: add idiom
   const [jsonText, setJsonText] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [episodes, setEpisodes] = useState<Array<{ tiktok_id: string; title: string; idiomData: IdiomData | null }>>([]);
-  const [editingEp, setEditingEp] = useState<{ tiktok_id: string; title: string; idiomData: IdiomData | null } | null>(null);
-  const [editJson, setEditJson] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
-  const [editResult, setEditResult] = useState<string | null>(null);
-
-  // Fetch episodes when panel opens and user is authed
-  const fetchEpisodes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/videos", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json();
-      const eps = (data.videos ?? []).map((v: Video) => ({
-        tiktok_id: v.tiktok_id,
-        title: v.title,
-        idiomData: (() => { try { const p = JSON.parse(v.summary || ""); return p?.idiom ? p : null; } catch { return null; } })(),
-      }));
-      setEpisodes(eps);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => { if (open && authed) fetchEpisodes(); }, [open, authed, fetchEpisodes]);
+  const [uploadResult, setUploadResult] = useState<string|null>(null);
+  // Admin: user management
+  const [users, setUsers] = useState<Array<{id:string;email:string;display_name:string;role:string;status:string;expires_at:string|null;created_at:string}>>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [open, onClose]);
   useEffect(() => { if (open) document.body.style.overflow = "hidden"; else document.body.style.overflow = ""; return () => { document.body.style.overflow = ""; }; }, [open]);
 
+  // Set initial tab based on session
+  useEffect(() => {
+    if (userSession?.role === "admin") setTab("admin");
+    else if (userSession) setTab("deck");
+    else setTab("login");
+  }, [userSession]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); setLoginLoading(true); setLoginError("");
     try {
-      const res = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: loginUser, password: loginPass }) });
+      // Try admin login first
+      const adminRes = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: loginEmail, password: loginPass }) });
+      if (adminRes.ok) {
+        const data = await adminRes.json();
+        onAuth(data.token, "admin");
+        setLoginEmail(""); setLoginPass("");
+        setTab("admin");
+        return;
+      }
+      // Try user login
+      const res = await fetch("/api/users/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: loginEmail, password: loginPass }) });
       const data = await res.json();
-      if (!res.ok) { setLoginError(data.error || "Login failed."); return; }
-      setToken(data.token); setAuthed(true); setLoginPass(""); onAuth(data.token);
+      if (!res.ok) { setLoginError(data.error); return; }
+      onAuth(data.token, "user");
+      setLoginEmail(""); setLoginPass("");
+      setTab("deck");
     } catch { setLoginError("Network error."); }
     finally { setLoginLoading(false); }
   };
 
-  const handleLogout = () => { setAuthed(false); setToken(""); setLoginUser(""); setLoginPass(""); setLoginError(""); setUploadResult(null); setJsonText(""); setEditingEp(null); onAuth(""); };
-
-  const handleDelete = async (tiktokId: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault(); setRegLoading(true); setRegResult(null);
     try {
-      const res = await fetch("/api/idioms/delete", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId }) });
+      const res = await fetch("/api/users/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: regEmail, password: regPass, displayName: regName }) });
       const data = await res.json();
-      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
-      if (!res.ok) { onToast(`Delete failed: ${data.error}`, "error"); return; }
-      onToast(`🗑️ Deleted "${data.deleted}"`, "success");
-      setEpisodes(eps => eps.filter(e => e.tiktok_id !== tiktokId));
-      onRefresh();
-    } catch { onToast("Network error.", "error"); }
+      if (!res.ok) { setRegResult(`❌ ${data.error}`); return; }
+      setRegResult(`✅ ${data.message}`);
+      setRegEmail(""); setRegPass(""); setRegName("");
+    } catch { setRegResult("❌ Network error."); }
+    finally { setRegLoading(false); }
   };
 
-  const handleEditStart = (ep: { tiktok_id: string; title: string; idiomData: IdiomData | null }) => {
-    setEditingEp(ep);
-    setEditJson(ep.idiomData ? JSON.stringify(ep.idiomData, null, 2) : "");
-    setEditResult(null);
-  };
-
-  const handleEditSave = async () => {
-    if (!editingEp || !editJson.trim()) return;
-    setEditSaving(true); setEditResult(null);
-    try {
-      const parsed = JSON.parse(editJson);
-      const res = await fetch("/api/idioms/edit", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId: editingEp.tiktok_id, data: parsed }) });
-      const data = await res.json();
-      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
-      if (!res.ok) { setEditResult(`❌ ${data.error}`); return; }
-      setEditResult(`✅ ${data.message}`);
-      setEditingEp(null);
-      fetchEpisodes();
-      onRefresh();
-    } catch (err) { setEditResult(`❌ Invalid JSON: ${err instanceof Error ? err.message : "parse error"}`); }
-    finally { setEditSaving(false); }
-  };
+  const handleLogout = () => { onAuth("", ""); setTab("login"); };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault(); if (!jsonText.trim()) return;
     setUploading(true); setUploadResult(null);
     try {
       const parsed = JSON.parse(jsonText);
-      const res = await fetch("/api/idioms/add", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(parsed) });
+      const res = await fetch("/api/idioms/add", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify(parsed) });
       const data = await res.json();
-      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
       if (!res.ok) { setUploadResult(`❌ ${data.error}`); return; }
-      setUploadResult(`✅ ${data.message}`);
-      setJsonText("");
-      onRefresh();
-      fetchEpisodes();
-    } catch (err) {
-      setUploadResult(`❌ Invalid JSON: ${err instanceof Error ? err.message : "parse error"}`);
-    } finally { setUploading(false); }
+      setUploadResult(`✅ ${data.message}`); setJsonText(""); onRefresh();
+    } catch (err) { setUploadResult(`❌ Invalid JSON: ${err instanceof Error ? err.message : "parse error"}`); }
+    finally { setUploading(false); }
   };
 
-  const handleSyncAll = async () => {
-    setSyncing(true);
+  const fetchUsers = async () => {
+    setUsersLoading(true);
     try {
-      const res = await fetch("/api/sync", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/users/manage", { headers: { Authorization: `Bearer ${adminToken}` } });
       const data = await res.json();
-      if (res.status === 401) { onToast("Session expired.", "error"); handleLogout(); return; }
-      if (!res.ok) { onToast(`Sync failed: ${data.detail ?? data.error}`, "error"); return; }
-      onToast(`✅ Sync complete — ${data.newVideos} new`, "success"); onRefresh();
-    } catch { onToast("Network error.", "error"); }
-    finally { setSyncing(false); }
+      if (res.ok) setUsers(data.users ?? []);
+    } catch { /* ignore */ }
+    finally { setUsersLoading(false); }
   };
+
+  const handleUserAction = async (userId: string, action: string, expiresAt?: string) => {
+    try {
+      const res = await fetch("/api/users/manage", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ userId, action, expiresAt }) });
+      const data = await res.json();
+      if (res.ok) { onToast(`✅ ${data.message}`, "success"); fetchUsers(); }
+      else onToast(`❌ ${data.error}`, "error");
+    } catch { onToast("Network error.", "error"); }
+  };
+
+  // Deck: get favourite videos
+  const deckVideos = videos.filter(v => favourites.has(v.tiktok_id));
 
   const sampleJson = `{
   "idiom": "Hit the nail on the head",
@@ -671,61 +676,105 @@ function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelPro
   "date": "2024-01-08",
   "thumbnail": "🎯",
   "color": "#FF6B6B",
-  "tiktokUrl": "https://www.tiktok.com/@patternspeakout/video/123",
-  "definitionEN": "To be precisely correct about something.",
-  "definitionTH": "พูดถูกต้องแม่นยำ / ตรงประเด็น",
+  "tiktokUrl": "",
+  "definitionEN": "To be precisely correct.",
+  "definitionTH": "พูดถูกต้องแม่นยำ",
   "synonyms": ["be spot on", "be exactly right"],
-  "antonyms": ["miss the point", "be off the mark"],
-  "keyWords": [
-    {
-      "word": "nail",
-      "cefr": "A1",
-      "pos": "noun",
-      "definitionEN": "A small metal spike",
-      "definitionTH": "ตะปู",
-      "synonyms": ["pin", "spike"],
-      "antonyms": []
-    }
-  ],
-  "examples": [
-    {
-      "en": "She hit the nail on the head with her analysis.",
-      "th": "เธอพูดได้ตรงประเด็นมากกับการวิเคราะห์"
-    }
-  ],
+  "antonyms": ["miss the point"],
+  "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A metal spike","definitionTH":"ตะปู","synonyms":["pin"],"antonyms":[]}],
+  "examples": [{"en":"She hit the nail on the head.","th":"เธอพูดได้ตรงประเด็น"}],
   "usage": "Formal & Informal",
-  "context": "Work, discussion, debate"
+  "context": "Work, discussion"
 }`;
 
   return (
     <>
       <div className={`admin-backdrop ${open ? "open" : ""}`} onClick={onClose} aria-hidden="true" />
-      <aside className={`admin-panel ${open ? "open" : ""}`} aria-label="Admin panel">
+      <aside className={`admin-panel ${open ? "open" : ""}`} aria-label="Side panel">
         <div className="admin-panel-header">
-          <div className="admin-panel-title"><span>⚙️</span><span>Sign in</span></div>
+          <div className="admin-panel-title"><span>⚙️</span><span>{userSession ? userSession.displayName : "Sign in"}</span></div>
           <button className="admin-panel-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <div className="admin-panel-body">
-          {!authed ? (
-            <form className="admin-login-form" onSubmit={handleLogin}>
-              <div className="admin-field"><label className="admin-label" htmlFor="ap-user">Username</label><input id="ap-user" className="admin-input" type="text" autoComplete="username" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} required autoFocus /></div>
-              <div className="admin-field"><label className="admin-label" htmlFor="ap-pass">Password</label><input id="ap-pass" className="admin-input" type="password" autoComplete="current-password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} required /></div>
-              {loginError && <div className="admin-error">{loginError}</div>}
-              <button className="admin-login-btn" type="submit" disabled={loginLoading}>{loginLoading ? <><span className="spin">↻</span> Signing in…</> : <>🔓 Sign in</>}</button>
-            </form>
-          ) : (
-            <>
-              <div className="admin-user-row"><div className="admin-user-badge"><span className="admin-user-dot" /><span>{loginUser}</span></div><button className="admin-logout-btn" onClick={handleLogout}>Sign out</button></div>
 
-              {/* Upload JSON */}
+        {/* Tab nav (only when logged in) */}
+        {userSession && (
+          <div className="panel-tabs">
+            {userSession.role === "admin" && <button className={`panel-tab ${tab === "admin" ? "active" : ""}`} onClick={() => setTab("admin")}>📝 Admin</button>}
+            {userSession.role === "admin" && <button className={`panel-tab ${tab === "users" ? "active" : ""}`} onClick={() => { setTab("users"); fetchUsers(); }}>👥 Users</button>}
+            <button className={`panel-tab ${tab === "deck" ? "active" : ""}`} onClick={() => setTab("deck")}>💾 My Deck</button>
+            <button className="panel-tab" onClick={handleLogout}>🚪</button>
+          </div>
+        )}
+
+        <div className="admin-panel-body">
+          {/* ─── Not logged in: Login / Register ─── */}
+          {!userSession && (
+            <>
+              <div className="panel-tabs" style={{ marginBottom: 16 }}>
+                <button className={`panel-tab ${tab === "login" ? "active" : ""}`} onClick={() => setTab("login")}>Sign in</button>
+                <button className={`panel-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>Register</button>
+              </div>
+
+              {tab === "login" && (
+                <form className="admin-login-form" onSubmit={handleLogin}>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-email">Email or Username</label><input id="sp-email" className="admin-input" type="text" autoComplete="username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required autoFocus /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-pass">Password</label><input id="sp-pass" className="admin-input" type="password" autoComplete="current-password" value={loginPass} onChange={e => setLoginPass(e.target.value)} required /></div>
+                  {loginError && <div className="admin-error">{loginError}</div>}
+                  <button className="admin-login-btn" type="submit" disabled={loginLoading}>{loginLoading ? <><span className="spin">↻</span> Signing in…</> : <>🔓 Sign in</>}</button>
+                </form>
+              )}
+
+              {tab === "register" && (
+                <form className="admin-login-form" onSubmit={handleRegister}>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-name">Display Name</label><input id="sp-reg-name" className="admin-input" value={regName} onChange={e => setRegName(e.target.value)} placeholder="Your name" /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-email">Email</label><input id="sp-reg-email" className="admin-input" type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} required placeholder="you@email.com" /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-pass">Password (min 6 chars)</label><input id="sp-reg-pass" className="admin-input" type="password" value={regPass} onChange={e => setRegPass(e.target.value)} required minLength={6} /></div>
+                  {regResult && <div className={`admin-result ${regResult.startsWith("✅") ? "ok" : "err"}`}>{regResult}</div>}
+                  <button className="admin-login-btn" type="submit" disabled={regLoading}>{regLoading ? <><span className="spin">↻</span> Registering…</> : <>📝 Register</>}</button>
+                  <p className="admin-hint" style={{ marginTop: 8 }}>After registering, admin must approve your account before you can sign in.</p>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* ─── Deck tab ─── */}
+          {userSession && tab === "deck" && (
+            <div>
+              <div className="admin-section-label">💾 My Deck ({deckVideos.length} saved)</div>
+              {deckVideos.length === 0 ? (
+                <p className="admin-hint" style={{ textAlign: "center", padding: 24 }}>ยังไม่มี idiom ใน deck — กด ❤️ บนการ์ดเพื่อบันทึก</p>
+              ) : (
+                <div className="admin-episode-list">
+                  {deckVideos.map(v => {
+                    const d = getIdiomData(v);
+                    return (
+                      <div key={v.tiktok_id} className="admin-ep-row">
+                        <div className="admin-ep-info">
+                          <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
+                          <div>
+                            <div className="admin-ep-name">{d?.idiom ?? v.title}</div>
+                            <div className="admin-ep-meta">{d?.cefr ?? ""} · {d?.partOfSpeech ?? ""}</div>
+                          </div>
+                        </div>
+                        <button className="admin-ep-btn delete" onClick={() => onToggleFav(v.tiktok_id)} title="Remove from deck">✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Admin: Add idiom ─── */}
+          {userSession?.role === "admin" && tab === "admin" && (
+            <>
               <div className="admin-card">
                 <div className="admin-section-label">📝 เพิ่ม Idiom (Paste JSON)</div>
-                <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง เว็บจะแสดงข้อมูลเต็มรูปแบบเหมือนเว็บเก่า</p>
+                <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง</p>
                 <form onSubmit={handleUpload}>
                   <div className="admin-field">
                     <textarea className="admin-input" style={{ minHeight: 600, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
-                      value={jsonText} onChange={(e) => { setJsonText(e.target.value); setUploadResult(null); }}
-                      placeholder={sampleJson} required />
+                      value={jsonText} onChange={e => { setJsonText(e.target.value); setUploadResult(null); }} placeholder={sampleJson} required />
                   </div>
                   <button className="admin-action-btn" type="submit" disabled={uploading || !jsonText.trim()}>
                     {uploading ? <><span className="spin">↻</span> Uploading…</> : <>➕ Add Idiom</>}
@@ -734,28 +783,56 @@ function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelPro
                 </form>
               </div>
 
-              {/* Template */}
               <div className="admin-card">
                 <div className="admin-section-label">📋 JSON Template</div>
                 <p className="admin-hint">ส่ง prompt นี้ให้ ChatGPT เพื่อสร้าง JSON ให้คุณ:</p>
                 <div style={{ position: "relative" }}>
-                  <button
-                    className="copy-btn"
-                    onClick={() => {
-                      const text = `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
-                      navigator.clipboard.writeText(text).then(() => onToast("Copied to clipboard!", "success")).catch(() => onToast("Copy failed", "error"));
-                    }}
-                    aria-label="Copy template to clipboard"
-                    title="Copy to clipboard"
-                  >
-                    📋 Copy
-                  </button>
-                  <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 12px 12px 12px", paddingTop: 36, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+                  <button className="copy-btn" onClick={() => {
+                    const text = `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
+                    navigator.clipboard.writeText(text).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
+                  }} aria-label="Copy">📋 Copy</button>
+                  <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
                     {`Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`}
                   </div>
                 </div>
               </div>
             </>
+          )}
+
+          {/* ─── Admin: User management ─── */}
+          {userSession?.role === "admin" && tab === "users" && (
+            <div>
+              <div className="admin-section-label">👥 User Management ({users.length})</div>
+              {usersLoading ? <p className="admin-hint">Loading…</p> : (
+                <div className="admin-episode-list" style={{ maxHeight: 500 }}>
+                  {users.map(u => (
+                    <div key={u.id} className="admin-ep-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div className="admin-ep-name">{u.display_name || u.email}</div>
+                          <div className="admin-ep-meta">{u.email} · {u.role} · <span style={{ color: u.status === "approved" ? "var(--accent-teal)" : u.status === "pending" ? "var(--accent-yellow)" : "var(--accent2)" }}>{u.status}</span></div>
+                          {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("th-TH")}</div>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {u.status === "pending" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>✅ Approve</button>}
+                        {u.status === "approved" && <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => handleUserAction(u.id, "remove")}>🚫 Remove</button>}
+                        {u.status === "removed" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>↩️ Reactivate</button>}
+                        <button className="edit-add-btn" onClick={() => {
+                          const d = prompt("Set expiry date (YYYY-MM-DD) or leave empty to remove expiry:");
+                          if (d === null) return;
+                          handleUserAction(u.id, "set_expiry", d || undefined);
+                        }}>📅 Set Expiry</button>
+                        <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => {
+                          if (confirm(`Permanently delete ${u.email}? This cannot be undone.`)) handleUserAction(u.id, "delete");
+                        }}>🗑️ Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                  {users.length === 0 && <p className="admin-hint" style={{ textAlign: "center", padding: 16 }}>No users yet.</p>}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </aside>
@@ -778,6 +855,8 @@ export default function Home() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [userSession, setUserSession] = useState<{ id: string; email: string; displayName: string; role: "admin"|"user" } | null>(null);
+  const [favourites, setFavourites] = useState<Set<string>>(new Set());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -852,7 +931,27 @@ export default function Home() {
         <span className="hamburger-line" /><span className="hamburger-line" /><span className="hamburger-line" />
       </button>
 
-      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} onAuth={(t) => setAdminToken(t)} />
+      <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)}
+        onAuth={(t, role) => {
+          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); }
+          else if (role === "user" && t) {
+            setAdminToken("");
+            // Fetch user info from token (user UUID)
+            fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); });
+            setUserSession({ id: t, email: "", displayName: "User", role: "user" });
+          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); }
+        }}
+        userSession={userSession} adminToken={adminToken} videos={videos} favourites={favourites}
+        onToggleFav={async (tiktokId) => {
+          if (!userSession) return;
+          const isFav = favourites.has(tiktokId);
+          const action = isFav ? "remove" : "add";
+          try {
+            await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId, action }) });
+            setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(tiktokId); else next.add(tiktokId); return next; });
+          } catch { /* ignore */ }
+        }}
+      />
 
       {/* Status */}
       <div className="status-bar"><div className="status-bar-inner"><div className="last-updated"><span className="live-dot" /><span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span></div></div></div>
@@ -911,6 +1010,15 @@ export default function Home() {
                   fetchVideos(true);
                 } catch { showToast("Network error.", "error"); }
               }}
+              isFav={favourites.has(video.tiktok_id)}
+              onFav={userSession ? async () => {
+                const isFav = favourites.has(video.tiktok_id);
+                const action = isFav ? "remove" : "add";
+                try {
+                  await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: video.tiktok_id, action }) });
+                  setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(video.tiktok_id); else next.add(video.tiktok_id); return next; });
+                } catch { /* ignore */ }
+              } : undefined}
             />
           ))}
         </div>
