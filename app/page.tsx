@@ -670,7 +670,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
     finally { setRegLoading(false); }
   };
 
-  const handleLogout = () => { onAuth("", ""); setTab("login"); };
+  const handleLogout = () => { if (confirm("Do you want to log out?")) { onAuth("", ""); setTab("login"); } };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault(); if (!jsonText.trim()) return;
