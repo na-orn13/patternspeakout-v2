@@ -730,7 +730,11 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "synonyms": ["I see it differently", "I'm not sure about that", "I respectfully disagree"],
   "antonyms": ["I totally agree", "Absolutely", "You're right"],
   "keyWords": [{"word":"disagree","cefr":"A2","pos":"verb","definitionEN":"To have a different opinion","definitionTH":"ไม่เห็นด้วย","synonyms":["differ","oppose"],"antonyms":["agree"]}],
-  "examples": [{"en":"I see your point, but I respectfully disagree.","th":"ฉันเข้าใจมุมของคุณ แต่ฉันไม่เห็นด้วยค่ะ"}],
+  "examples": [
+    {"en":"I see your point, but I respectfully disagree.","th":"ฉันเข้าใจมุมของคุณ แต่ฉันไม่เห็นด้วยค่ะ"},
+    {"en":"I'm not sure I agree with that approach.","th":"ฉันไม่แน่ใจว่าเห็นด้วยกับวิธีนั้น"},
+    {"en":"That's an interesting idea, but I have a different view.","th":"นั่นเป็นไอเดียที่น่าสนใจ แต่ฉันมีมุมมองที่แตกต่าง"}
+  ],
   "usage": "Formal & Semi-formal",
   "context": "Work, meetings, discussions"
 }` : addCategory === "motto" ? `{
@@ -744,10 +748,14 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "tiktokUrl": "",
   "definitionEN": "You have to work hard and suffer to achieve something worthwhile.",
   "definitionTH": "ไม่มีความเจ็บปวด ก็ไม่มีความสำเร็จ — ต้องอดทนทำงานหนักถึงจะได้ผลลัพธ์ที่ดี",
-  "synonyms": ["no cross, no crown", "nothing ventured, nothing gained"],
-  "antonyms": ["easy come, easy go"],
+  "synonyms": ["no cross, no crown", "nothing ventured, nothing gained", "no guts, no glory"],
+  "antonyms": ["easy come, easy go", "take it easy"],
   "keyWords": [{"word":"gain","cefr":"A2","pos":"noun/verb","definitionEN":"Something achieved; to obtain","definitionTH":"สิ่งที่ได้มา / ได้รับ","synonyms":["profit","achieve"],"antonyms":["loss","lose"]}],
-  "examples": [{"en":"I trained every day for months. No pain, no gain!","th":"ฉันฝึกทุกวันเป็นเดือน ไม่เจ็บก็ไม่ได้ผล!"}],
+  "examples": [
+    {"en":"I trained every day for months. No pain, no gain!","th":"ฉันฝึกทุกวันเป็นเดือน ไม่เจ็บก็ไม่ได้ผล!"},
+    {"en":"Studying is hard, but no pain, no gain — you'll pass the exam.","th":"การเรียนมันยาก แต่ไม่ลำบากก็ไม่สำเร็จ — เธอจะสอบผ่าน"},
+    {"en":"She worked two jobs to save money. No pain, no gain.","th":"เธอทำงานสองที่เพื่อเก็บเงิน ไม่เหนื่อยก็ไม่ได้ผล"}
+  ],
   "usage": "Informal",
   "context": "Motivation, fitness, self-improvement"
 }` : `{
@@ -761,12 +769,16 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   "tiktokUrl": "",
   "definitionEN": "To be precisely correct about something.",
   "definitionTH": "พูดถูกต้องแม่นยำ / ตรงประเด็น",
-  "synonyms": ["be spot on", "be exactly right"],
-  "antonyms": ["miss the point"],
-  "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A metal spike","definitionTH":"ตะปู","synonyms":["pin"],"antonyms":[]}],
-  "examples": [{"en":"She hit the nail on the head.","th":"เธอพูดได้ตรงประเด็น"}],
+  "synonyms": ["be spot on", "be exactly right", "be dead right"],
+  "antonyms": ["miss the point", "be off the mark", "be wide of the mark"],
+  "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A small metal spike hammered into wood","definitionTH":"ตะปู","synonyms":["pin","spike"],"antonyms":[]}],
+  "examples": [
+    {"en":"She hit the nail on the head with her analysis.","th":"เธอพูดได้ตรงประเด็นมากกับการวิเคราะห์"},
+    {"en":"The critic hit the nail on the head with his review.","th":"นักวิจารณ์พูดได้ถูกต้องแม่นยำมากกับบทวิจารณ์"},
+    {"en":"You hit the nail on the head — that's exactly the problem.","th":"คุณพูดถูกเลย — นั่นแหละคือปัญหา"}
+  ],
   "usage": "Formal & Informal",
-  "context": "Work, discussion"
+  "context": "Work, discussion, debate"
 }`;
 
   return (
@@ -1035,6 +1047,21 @@ export default function Home() {
       case "cefr": { const o: Record<string, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 }; result.sort((a, b) => (o[getIdiomData(a)?.cefr ?? "B1"] ?? 3) - (o[getIdiomData(b)?.cefr ?? "B1"] ?? 3)); break; }
     }
     setFiltered(result);
+
+    // Compute episode numbers: oldest = 1, per category
+    const map = new Map<string, number>();
+    const catGroups: Record<string, Video[]> = {};
+    for (const v of videos) {
+      const d = getIdiomData(v);
+      const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
+      if (!catGroups[cat]) catGroups[cat] = [];
+      catGroups[cat].push(v);
+    }
+    for (const cat of Object.keys(catGroups)) {
+      catGroups[cat].sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
+      catGroups[cat].forEach((v, i) => map.set(v.tiktok_id, i + 1));
+    }
+    setEpMap(map);
   }, [videos, search, sort, cefrFilter, category]);
 
   // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
