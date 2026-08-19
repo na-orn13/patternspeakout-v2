@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Video {
   id: string;
   tiktok_id: string;
@@ -27,15 +27,17 @@ interface ApiResponse {
   error?: string;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-const POLL_INTERVAL_MS = 60_000; // re-fetch every 60 s
+// ─── Constants ────────────────────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 60_000;
 const CARD_COLORS = [
-  "#FF6B6B", "#4ECDC4", "#FFE66D", "#A8E6CF", "#FF8B94",
-  "#C3B1E1", "#FFB347", "#85C1E9", "#F0A500", "#82E0AA",
-  "#FAD7A0", "#AED6F1",
+  "#FF6B6B","#4ECDC4","#FFE66D","#A8E6CF","#FF8B94",
+  "#C3B1E1","#FFB347","#85C1E9","#F0A500","#82E0AA",
+  "#FAD7A0","#AED6F1",
 ];
-const CARD_EMOJIS = ["🎯","🧊","💪","🫘","💸","🤒","🪨","🐱","🕯️","😬","🎾","🌙",
-  "📚","✨","🔥","💡","🌟","🎓","📖","🗣️"];
+const CARD_EMOJIS = [
+  "🎯","🧊","💪","🫘","💸","🤒","🪨","🐱","🕯️","😬","🎾","🌙",
+  "📚","✨","🔥","💡","🌟","🎓","📖","🗣️",
+];
 
 function colorFor(id: string, i: number) {
   const n = parseInt(id.replace(/\D/g, "").slice(-3) || String(i), 10);
@@ -111,25 +113,15 @@ function VideoCard({ video, index, onClick }: { video: Video; index: number; onC
       aria-label={`เปิดรายละเอียด: ${video.title}`}
     >
       <div className="card-accent-line" style={{ background: color }} />
-
       <div className="card-header">
         {video.cover_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={video.cover_image_url}
-            alt={video.title}
-            className="video-thumbnail"
-            loading="lazy"
-          />
+          <img src={video.cover_image_url} alt={video.title} className="video-thumbnail" loading="lazy" />
         ) : (
-          <div
-            className="card-emoji"
-            style={{ background: `${color}22`, border: `1px solid ${color}44` }}
-          >
+          <div className="card-emoji" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>
             {emoji}
           </div>
         )}
-
         <div className="card-meta">
           <div className="card-episode">EP.{epNum}</div>
           <div className="card-idiom-title" style={{ fontSize: 15 }}>
@@ -145,14 +137,12 @@ function VideoCard({ video, index, onClick }: { video: Video; index: number; onC
           </div>
         </div>
       </div>
-
       <div className="card-body">
         <div className="card-def-en" style={{ WebkitLineClamp: 3 }}>
           {video.summary
             ? video.summary.slice(0, 160).replace(/\*\*/g, "") + (video.summary.length > 160 ? "…" : "")
             : video.caption.slice(0, 160) + (video.caption.length > 160 ? "…" : "")}
         </div>
-
         <div className="video-stats">
           <span className="stat-chip">👁 {fmtNum(video.view_count)}</span>
           <span className="stat-chip">❤️ {fmtNum(video.like_count)}</span>
@@ -160,7 +150,6 @@ function VideoCard({ video, index, onClick }: { video: Video; index: number; onC
           <span className="stat-chip">↗️ {fmtNum(video.share_count)}</span>
         </div>
       </div>
-
       <div className="card-footer">
         <div className="card-date">{fmtDate(video.published_at)}</div>
         <div className="card-expand-btn">
@@ -175,8 +164,8 @@ function VideoCard({ video, index, onClick }: { video: Video; index: number; onC
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-function Modal({ video, index, onClose }: { video: Video; index: number; onClose: () => void }) {
+// ─── Video Modal ──────────────────────────────────────────────────────────────
+function VideoModal({ video, index, onClose }: { video: Video; index: number; onClose: () => void }) {
   const color = colorFor(video.tiktok_id, index);
   const emoji = emojiFor(video.tiktok_id, index);
   const [activeTab, setActiveTab] = useState<"summary" | "caption">("summary");
@@ -196,59 +185,39 @@ function Modal({ video, index, onClose }: { video: Video; index: number; onClose
     <div
       className="modal-overlay active"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
+      role="dialog" aria-modal="true" aria-labelledby="modal-title"
     >
       <div className="modal">
         <button className="modal-close" onClick={onClose} aria-label="ปิด">✕</button>
-
-        {/* Hero */}
-        <div
-          className="modal-hero"
-          id="modalHero"
-          style={{ background: `linear-gradient(135deg, ${color}14 0%, transparent 60%)`, borderBottom: `1px solid ${color}30` }}
-        >
-          <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: color, opacity: 0.06, pointerEvents: "none" }} />
-
+        <div className="modal-hero" style={{
+          background: `linear-gradient(135deg, ${color}14 0%, transparent 60%)`,
+          borderBottom: `1px solid ${color}30`,
+        }}>
+          <div style={{ position:"absolute",top:-60,right:-60,width:200,height:200,borderRadius:"50%",background:color,opacity:0.06,pointerEvents:"none" }} />
           <div className="modal-episode-row">
             <span className="modal-episode">EP.{String(index + 1).padStart(3, "0")}</span>
             <span style={{ color: "var(--border)" }}>·</span>
             <span className="modal-date">{fmtDate(video.published_at)}</span>
           </div>
-
           <div className="modal-emoji-title">
-            <div
-              className="modal-emoji"
-              style={{ background: `${color}22`, border: `1px solid ${color}44` }}
-            >
-              {emoji}
-            </div>
+            <div className="modal-emoji" style={{ background:`${color}22`, border:`1px solid ${color}44` }}>{emoji}</div>
             <div className="modal-title-wrap">
-              <div
-                id="modal-title"
-                className="modal-idiom-name"
-                style={{
-                  background: `linear-gradient(135deg, #f5f5f5, ${color})`,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
+              <div id="modal-title" className="modal-idiom-name" style={{
+                background: `linear-gradient(135deg, #f5f5f5, ${color})`,
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+              }}>
                 {video.title || "Idiom of the Day"}
               </div>
               <div className="modal-tags">
                 <span className="tag tag-pos">TikTok Video</span>
                 {video.duration > 0 && (
-                  <span className="tag" style={{ background: "var(--bg-glass)", border: "1px solid var(--border)", fontSize: 11 }}>
+                  <span className="tag" style={{ background:"var(--bg-glass)", border:"1px solid var(--border)", fontSize:11 }}>
                     ⏱ {video.duration}s
                   </span>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Stats row */}
           <div className="video-stats" style={{ marginTop: 8 }}>
             <span className="stat-chip">👁 {fmtNum(video.view_count)} views</span>
             <span className="stat-chip">❤️ {fmtNum(video.like_count)} likes</span>
@@ -257,93 +226,309 @@ function Modal({ video, index, onClose }: { video: Video; index: number; onClose
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="modal-tabs">
-          <button
-            className={`modal-tab ${activeTab === "summary" ? "active" : ""}`}
-            onClick={() => setActiveTab("summary")}
-          >
+          <button className={`modal-tab ${activeTab === "summary" ? "active" : ""}`} onClick={() => setActiveTab("summary")}>
             📋 Summary
           </button>
-          <button
-            className={`modal-tab ${activeTab === "caption" ? "active" : ""}`}
-            onClick={() => setActiveTab("caption")}
-          >
+          <button className={`modal-tab ${activeTab === "caption" ? "active" : ""}`} onClick={() => setActiveTab("caption")}>
             📝 Caption
           </button>
-          <a
-            href={video.share_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="modal-tab"
-            style={{ textDecoration: "none", marginLeft: "auto" }}
-          >
+          <a href={video.share_url} target="_blank" rel="noopener noreferrer"
+            className="modal-tab" style={{ textDecoration:"none", marginLeft:"auto" }}>
             🎵 TikTok ↗
           </a>
         </div>
 
-        {/* Body */}
         <div className="modal-body">
-
-          {/* Summary tab */}
           <div className={`tab-panel ${activeTab === "summary" ? "active" : ""}`}>
             <div className="modal-section">
-              <div className="section-label">
-                <span className="icon">📋</span>
-                AI Summary
-              </div>
-
+              <div className="section-label"><span className="icon">📋</span>AI Summary</div>
               <div className="summary-source-badge">
                 ⚠️ {video.summary_source === "caption"
                   ? "Caption-based summary — no transcript available from TikTok API"
-                  : video.summary_source === "transcript"
-                    ? "Transcript-based summary"
-                    : "Manually written"}
+                  : video.summary_source === "transcript" ? "Transcript-based summary" : "Manually written"}
               </div>
-
               {video.summary ? (
                 <div className="summary-box">{video.summary}</div>
               ) : (
-                <div className="summary-box" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-                  Summary not yet generated. Click "Sync Now" in the admin bar to generate summaries.
+                <div className="summary-box" style={{ color:"var(--text-muted)", fontStyle:"italic" }}>
+                  Summary not yet generated. Use the admin panel to sync.
                 </div>
               )}
             </div>
-
             <div className="modal-section" style={{ marginTop: 24 }}>
-              <div className="section-label">
-                <span className="icon">📊</span>
-                Video Stats
-              </div>
+              <div className="section-label"><span className="icon">📊</span>Video Stats</div>
               <div className="usage-row">
-                <div className="usage-badge">
-                  <span><strong>Published</strong>{fmtDate(video.published_at)}</span>
-                </div>
-                <div className="context-badge">
-                  <span><strong>Last synced</strong>{fmtDate(video.synced_at)}</span>
-                </div>
+                <div className="usage-badge"><span><strong>Published</strong>{fmtDate(video.published_at)}</span></div>
+                <div className="context-badge"><span><strong>Last synced</strong>{fmtDate(video.synced_at)}</span></div>
               </div>
             </div>
           </div>
-
-          {/* Caption tab */}
           <div className={`tab-panel ${activeTab === "caption" ? "active" : ""}`}>
             <div className="modal-section">
-              <div className="section-label">
-                <span className="icon">📝</span>
-                Original Caption
-              </div>
+              <div className="section-label"><span className="icon">📝</span>Original Caption</div>
               <div className="def-box en">
-                <div className="def-text" style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                <div className="def-text" style={{ whiteSpace:"pre-wrap", lineHeight:1.8 }}>
                   {video.caption || "(No caption available)"}
                 </div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Admin Panel ──────────────────────────────────────────────────────────────
+interface AdminPanelProps {
+  open: boolean;
+  onClose: () => void;
+  onToast: (msg: string, type: "success" | "error") => void;
+  onRefresh: () => void;
+}
+
+function AdminPanel({ open, onClose, onToast, onRefresh }: AdminPanelProps) {
+  // Login state
+  const [authed, setAuthed] = useState(false);
+  const [token, setToken] = useState("");
+  const [loginUser, setLoginUser] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+
+  // Single-video state
+  const [videoUrl, setVideoUrl] = useState("");
+  const [singleLoading, setSingleLoading] = useState(false);
+  const [singleResult, setSingleResult] = useState<string | null>(null);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginUser, password: loginPass }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(data.error || "Login failed.");
+        return;
+      }
+      setToken(data.token);
+      setAuthed(true);
+      setLoginPass("");
+    } catch {
+      setLoginError("Network error. Please try again.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setAuthed(false);
+    setToken("");
+    setLoginUser("");
+    setLoginPass("");
+    setLoginError("");
+    setSingleResult(null);
+    setVideoUrl("");
+  };
+
+  const handleSyncAll = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.status === 401) { onToast("Session expired — please log in again.", "error"); handleLogout(); return; }
+      if (!res.ok) { onToast(`Sync failed: ${data.detail ?? data.error}`, "error"); return; }
+      onToast(`✅ Sync complete — ${data.newVideos} new video${data.newVideos !== 1 ? "s" : ""} added`, "success");
+      onRefresh();
+    } catch { onToast("Network error during sync.", "error"); }
+    finally { setSyncing(false); }
+  };
+
+  const handleSingleVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!videoUrl.trim()) return;
+    setSingleLoading(true);
+    setSingleResult(null);
+    try {
+      const res = await fetch("/api/sync/single", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: videoUrl.trim() }),
+      });
+      const data = await res.json();
+      if (res.status === 401) { onToast("Session expired — please log in again.", "error"); handleLogout(); return; }
+      if (!res.ok) { setSingleResult(`❌ ${data.error}`); return; }
+      if (data.duplicate) {
+        setSingleResult(`⚠️ Already in database: "${data.title}"`);
+      } else {
+        setSingleResult(`✅ Added: "${data.title}"`);
+        onRefresh();
+        setVideoUrl("");
+      }
+    } catch { setSingleResult("❌ Network error."); }
+    finally { setSingleLoading(false); }
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`admin-backdrop ${open ? "open" : ""}`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Slide-in panel */}
+      <aside className={`admin-panel ${open ? "open" : ""}`} aria-label="Admin panel">
+        {/* Header */}
+        <div className="admin-panel-header">
+          <div className="admin-panel-title">
+            <span>⚙️</span>
+            <span>Admin Panel</span>
+          </div>
+          <button className="admin-panel-close" onClick={onClose} aria-label="Close admin panel">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="admin-panel-body">
+          {!authed ? (
+            /* ── Login form ── */
+            <form className="admin-login-form" onSubmit={handleLogin}>
+              <div className="admin-section-label">🔐 Sign in to manage</div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="ap-user">Username</label>
+                <input
+                  id="ap-user"
+                  className="admin-input"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="admin_pimjaa13"
+                  value={loginUser}
+                  onChange={(e) => setLoginUser(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="ap-pass">Password</label>
+                <input
+                  id="ap-pass"
+                  className="admin-input"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={loginPass}
+                  onChange={(e) => setLoginPass(e.target.value)}
+                  required
+                />
+              </div>
+              {loginError && <div className="admin-error">{loginError}</div>}
+              <button className="admin-login-btn" type="submit" disabled={loginLoading}>
+                {loginLoading ? <span className="spin">↻</span> : "🔓"} {loginLoading ? " Signing in…" : " Sign in"}
+              </button>
+            </form>
+          ) : (
+            /* ── Authenticated view ── */
+            <>
+              {/* Logged-in badge */}
+              <div className="admin-user-row">
+                <div className="admin-user-badge">
+                  <span className="admin-user-dot" />
+                  <span>admin_pimjaa13</span>
+                </div>
+                <button className="admin-logout-btn" onClick={handleLogout}>Sign out</button>
+              </div>
+
+              {/* ── Sync all videos ── */}
+              <div className="admin-card">
+                <div className="admin-section-label">🔄 Sync All Videos</div>
+                <p className="admin-hint">
+                  Fetches all videos from the source and adds any new ones to the database.
+                  Existing video stats are also updated.
+                </p>
+                <button
+                  className="admin-action-btn"
+                  onClick={handleSyncAll}
+                  disabled={syncing}
+                >
+                  {syncing ? <><span className="spin">↻</span> Syncing…</> : <>↻ Sync Now</>}
+                </button>
+              </div>
+
+              {/* ── Add single video ── */}
+              <div className="admin-card">
+                <div className="admin-section-label">🔗 Add Specific Video</div>
+                <p className="admin-hint">
+                  Paste a TikTok video URL to add it manually.
+                  Accepts full URLs like<br />
+                  <code>tiktok.com/@user/video/123456789</code>
+                </p>
+                <form onSubmit={handleSingleVideo}>
+                  <div className="admin-field">
+                    <label className="admin-label" htmlFor="ap-url">TikTok Video URL</label>
+                    <input
+                      id="ap-url"
+                      className="admin-input"
+                      type="url"
+                      placeholder="https://www.tiktok.com/@patternspeakout/video/…"
+                      value={videoUrl}
+                      onChange={(e) => { setVideoUrl(e.target.value); setSingleResult(null); }}
+                      required
+                    />
+                  </div>
+                  <button
+                    className="admin-action-btn"
+                    type="submit"
+                    disabled={singleLoading || !videoUrl.trim()}
+                  >
+                    {singleLoading ? <><span className="spin">↻</span> Adding…</> : <>➕ Add Video</>}
+                  </button>
+                  {singleResult && (
+                    <div className={`admin-result ${singleResult.startsWith("✅") ? "ok" : singleResult.startsWith("⚠️") ? "warn" : "err"}`}>
+                      {singleResult}
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* ── Info ── */}
+              <div className="admin-info-box">
+                <strong>Phase 1 note</strong><br />
+                TikTok API is not connected yet. Single-video add saves a stub record.
+                Real metadata (title, stats, cover) will be populated once
+                <code>TIKTOK_ACCESS_TOKEN</code> is configured in Phase 2.
+              </div>
+            </>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -355,59 +540,46 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRateLimit, setIsRateLimit] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
   const [selectedVideo, setSelectedVideo] = useState<{ video: Video; index: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [adminSecret, setAdminSecret] = useState("");
-  const [showSecretInput, setShowSecretInput] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const showToast = (msg: string, type: "success" | "error") => {
+  const showToast = useCallback((msg: string, type: "success" | "error") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, type });
     toastTimer.current = setTimeout(() => setToast({ msg: "", type: "" }), 3500);
-  };
+  }, []);
 
   // ── Fetch videos ──────────────────────────────────────────────────────────
   const fetchVideos = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError(null);
     setIsRateLimit(false);
-
     try {
       const res = await fetch("/api/videos", { cache: "no-store" });
-
-      if (res.status === 429) {
-        setIsRateLimit(true);
-        return;
-      }
+      if (res.status === 429) { setIsRateLimit(true); return; }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-
       const data: ApiResponse = await res.json();
       setVideos(data.videos);
       setLastSync(data.lastSync);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial fetch + polling
   useEffect(() => {
     fetchVideos();
     pollTimer.current = setInterval(() => fetchVideos(true), POLL_INTERVAL_MS);
-    return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
-    };
+    return () => { if (pollTimer.current) clearInterval(pollTimer.current); };
   }, [fetchVideos]);
 
   // ── Filter & sort ─────────────────────────────────────────────────────────
@@ -415,82 +587,22 @@ export default function Home() {
     let result = [...videos];
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (v) =>
-          v.title.toLowerCase().includes(q) ||
-          v.caption.toLowerCase().includes(q) ||
-          (v.summary ?? "").toLowerCase().includes(q)
+      result = result.filter(v =>
+        v.title.toLowerCase().includes(q) ||
+        v.caption.toLowerCase().includes(q) ||
+        (v.summary ?? "").toLowerCase().includes(q)
       );
     }
     switch (sort) {
-      case "newest":
-        result.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
-        break;
-      case "oldest":
-        result.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
-        break;
-      case "views":
-        result.sort((a, b) => b.view_count - a.view_count);
-        break;
-      case "likes":
-        result.sort((a, b) => b.like_count - a.like_count);
-        break;
+      case "newest": result.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()); break;
+      case "oldest": result.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime()); break;
+      case "views":  result.sort((a, b) => b.view_count - a.like_count); break;
+      case "likes":  result.sort((a, b) => b.like_count - a.like_count); break;
     }
     setFiltered(result);
   }, [videos, search, sort]);
 
-  // ── Admin sync ────────────────────────────────────────────────────────────
-  const handleSync = async () => {
-    const secret = adminSecret.trim();
-    if (!secret) {
-      setShowSecretInput(true);
-      return;
-    }
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${secret}` },
-      });
-      const body = await res.json();
-      if (res.status === 401) {
-        showToast("Incorrect admin secret", "error");
-        return;
-      }
-      if (res.status === 429) {
-        showToast("Rate limited — try again later", "error");
-        return;
-      }
-      if (!res.ok) {
-        showToast(`Sync failed: ${body.detail ?? body.error}`, "error");
-        return;
-      }
-      showToast(
-        `Sync complete — ${body.newVideos} new video${body.newVideos !== 1 ? "s" : ""} added`,
-        "success"
-      );
-      await fetchVideos(true);
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Sync error", "error");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // Admin toggle: triple-click the "last updated" area
-  const clickCount = useRef(0);
-  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleAdminToggle = () => {
-    clickCount.current += 1;
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => { clickCount.current = 0; }, 600);
-    if (clickCount.current >= 3) {
-      setShowAdmin((v) => !v);
-      clickCount.current = 0;
-    }
-  };
-
-  // ── Particles (client-only) ───────────────────────────────────────────────
+  // ── Particles ─────────────────────────────────────────────────────────────
   const particlesRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const container = particlesRef.current;
@@ -498,14 +610,7 @@ export default function Home() {
     for (let i = 0; i < 20; i++) {
       const p = document.createElement("div");
       p.className = "particle";
-      p.style.cssText = `
-        left:${Math.random() * 100}%;
-        animation-duration:${6 + Math.random() * 10}s;
-        animation-delay:${Math.random() * 8}s;
-        width:${1 + Math.random() * 3}px;
-        height:${1 + Math.random() * 3}px;
-        background:${Math.random() > 0.5 ? "#ff2d55" : "#ffd60a"};
-      `;
+      p.style.cssText = `left:${Math.random()*100}%;animation-duration:${6+Math.random()*10}s;animation-delay:${Math.random()*8}s;width:${1+Math.random()*3}px;height:${1+Math.random()*3}px;background:${Math.random()>.5?"#ff2d55":"#ffd60a"};`;
       container.appendChild(p);
     }
   }, []);
@@ -518,115 +623,73 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* HERO */}
+      {/* ── HERO ── */}
       <header className="hero">
         <div className="particles" ref={particlesRef} aria-hidden="true" />
-
         <div className="channel-badge">
           <span className="tiktok-logo">tt</span>
           @patternspeakout &nbsp;·&nbsp; Idiom of the Day
         </div>
-
-        <h1>
-          <span className="gradient-text">Idiom of the Day</span>
-          <br />Vlog Summary
-        </h1>
-
+        <h1><span className="gradient-text">Idiom of the Day</span><br />Vlog Summary</h1>
         <p className="subtitle">
-          สรุปทุก Episode จาก TikTok{" "}
-          <strong>@patternspeakout</strong> — เรียนรู้ Idiom ภาษาอังกฤษพร้อม
-          AI Summary, ความหมายไทย–อังกฤษ และตัวอย่างประโยค
+          สรุปทุก Episode จาก TikTok <strong>@patternspeakout</strong> —
+          เรียนรู้ Idiom ภาษาอังกฤษพร้อม AI Summary, ความหมายไทย–อังกฤษ และตัวอย่างประโยค
         </p>
-
         <div className="hero-stats">
           <div className="stat-item">
             <div className="stat-number">{loading ? "…" : videos.length}</div>
             <div className="stat-label">Episodes</div>
           </div>
-          <div className="stat-item">
-            <div className="stat-number">🤖</div>
-            <div className="stat-label">AI Summary</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">🇹🇭 🇬🇧</div>
-            <div className="stat-label">Bilingual</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">🔴</div>
-            <div className="stat-label">Live Data</div>
-          </div>
+          <div className="stat-item"><div className="stat-number">🤖</div><div className="stat-label">AI Summary</div></div>
+          <div className="stat-item"><div className="stat-number">🇹🇭 🇬🇧</div><div className="stat-label">Bilingual</div></div>
+          <div className="stat-item"><div className="stat-number">🔴</div><div className="stat-label">Live Data</div></div>
         </div>
       </header>
 
-      {/* STATUS BAR */}
+      {/* ── HAMBURGER BUTTON ── */}
+      <button
+        className={`hamburger-btn ${adminOpen ? "active" : ""}`}
+        onClick={() => setAdminOpen(v => !v)}
+        aria-label={adminOpen ? "Close admin panel" : "Open admin panel"}
+        aria-expanded={adminOpen}
+      >
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+      </button>
+
+      {/* ── ADMIN PANEL ── */}
+      <AdminPanel
+        open={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        onToast={showToast}
+        onRefresh={() => fetchVideos(true)}
+      />
+
+      {/* ── STATUS BAR ── */}
       <div className="status-bar">
         <div className="status-bar-inner">
-          <div className="last-updated" onClick={handleAdminToggle} style={{ cursor: "default" }}>
+          <div className="last-updated">
             <span className="live-dot" />
             <span>อัปเดตล่าสุด: {fmtDatetime(lastSync)}</span>
           </div>
-
-          {/* Admin section — revealed by triple-click */}
-          {showAdmin && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {showSecretInput && (
-                <input
-                  type="password"
-                  placeholder="Admin secret…"
-                  value={adminSecret}
-                  onChange={(e) => setAdminSecret(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSync()}
-                  style={{
-                    padding: "6px 12px", borderRadius: 100, border: "1px solid var(--border)",
-                    background: "var(--bg-card)", color: "var(--text-primary)",
-                    fontFamily: "var(--font-main)", fontSize: 13, outline: "none", width: 180,
-                  }}
-                  autoFocus
-                />
-              )}
-              <button
-                className="sync-btn"
-                onClick={handleSync}
-                disabled={syncing}
-                aria-label="Sync videos now"
-              >
-                {syncing ? <span className="spin">↻</span> : "↻"}
-                {syncing ? " Syncing…" : " Sync Now"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* CONTROLS */}
+      {/* ── CONTROLS ── */}
       <nav className="controls-bar" aria-label="Filter and search controls">
         <div className="controls-inner">
           <div className="search-wrap">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              aria-hidden="true">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหา Idiom, Summary, Caption…"
-              aria-label="ค้นหา"
-              autoComplete="off"
-              id="searchInput"
-            />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหา Idiom, Summary, Caption…" aria-label="ค้นหา" autoComplete="off" id="searchInput" />
           </div>
-
-          <select
-            className="sort-select"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            aria-label="เรียงลำดับ"
-          >
+          <select className="sort-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="เรียงลำดับ">
             <option value="newest">ใหม่สุด ↓</option>
             <option value="oldest">เก่าสุด ↑</option>
             <option value="views">ยอดวิวสูงสุด</option>
@@ -635,12 +698,11 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* MAIN */}
+      {/* ── MAIN ── */}
       <main className="main-content">
         <div className="section-header">
           <h2 className="section-title">
-            <span className="dot" aria-hidden="true" />
-            All Episodes
+            <span className="dot" aria-hidden="true" />All Episodes
           </h2>
           <div className="result-count" aria-live="polite">
             {loading ? "กำลังโหลด…" : `${filtered.length} video${filtered.length !== 1 ? "s" : ""}`}
@@ -648,112 +710,67 @@ export default function Home() {
         </div>
 
         <div className="idiom-grid" role="list">
-          {/* Loading */}
           {loading && <SkeletonGrid />}
-
-          {/* Rate limit */}
           {!loading && isRateLimit && (
             <div className="rate-limit-banner">
               <span style={{ fontSize: 20 }}>⏳</span>
               <div>
-                <strong>Rate limited</strong> — Too many requests. Please wait a moment and try again.
-                <br />
-                <button className="retry-btn" style={{ marginTop: 8 }} onClick={() => fetchVideos()}>
-                  Try again
-                </button>
+                <strong>Rate limited</strong> — Too many requests. Please wait a moment.
+                <br /><button className="retry-btn" style={{ marginTop: 8 }} onClick={() => fetchVideos()}>Try again</button>
               </div>
             </div>
           )}
-
-          {/* Error */}
           {!loading && !isRateLimit && error && (
             <div className="error-state">
               <span style={{ fontSize: 48 }}>⚠️</span>
               <h3>ไม่สามารถโหลดข้อมูลได้</h3>
               <p>{error}</p>
-              <button className="retry-btn" onClick={() => fetchVideos()}>
-                ลองอีกครั้ง
-              </button>
+              <button className="retry-btn" onClick={() => fetchVideos()}>ลองอีกครั้ง</button>
             </div>
           )}
-
-          {/* Empty */}
           {!loading && !error && !isRateLimit && filtered.length === 0 && (
             <div className="no-results">
-              <span className="no-results-emoji">
-                {search ? "🔍" : "📭"}
-              </span>
-              <h3>
-                {search
-                  ? "ไม่พบ Idiom ที่ค้นหา"
-                  : "ยังไม่มีวิดีโอ — กด Sync Now เพื่อโหลดข้อมูล"}
-              </h3>
-              <p>
-                {search
-                  ? "ลองค้นหาด้วยคำอื่น"
-                  : "Triple-click the 'Last updated' bar above to reveal the admin panel"}
-              </p>
+              <span className="no-results-emoji">{search ? "🔍" : "📭"}</span>
+              <h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มีวิดีโอ"}</h3>
+              <p>{search ? "ลองค้นหาด้วยคำอื่น" : "เปิด Admin Panel (☰) แล้วกด Sync Now"}</p>
             </div>
           )}
-
-          {/* Cards */}
           {!loading && !error && !isRateLimit &&
             filtered.map((video, i) => (
-              <VideoCard
-                key={video.id}
-                video={video}
-                index={i}
-                onClick={() => setSelectedVideo({ video, index: i })}
-              />
+              <VideoCard key={video.id} video={video} index={i} onClick={() => setSelectedVideo({ video, index: i })} />
             ))}
         </div>
       </main>
 
-      {/* FOOTER */}
+      {/* ── FOOTER ── */}
       <footer>
         <div className="footer-inner">
           <div className="footer-logo">Pattern Speak Out</div>
           <p>
             เว็บไซต์นี้เป็น Vlog Summary สรุปเนื้อหาจาก TikTok{" "}
-            <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer">
-              @patternspeakout
-            </a>
-            <br />
-            Summaries generated by OpenAI GPT-3.5 · Based on video captions · No transcript data from TikTok API
+            <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer">@patternspeakout</a>
+            <br />Summaries generated by OpenAI GPT-3.5 · Based on video captions · No transcript data from TikTok API
           </p>
-          <a
-            className="footer-tiktok-link"
-            href="https://www.tiktok.com/@patternspeakout"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="ดูช่อง @patternspeakout บน TikTok"
-          >
+          <a className="footer-tiktok-link" href="https://www.tiktok.com/@patternspeakout"
+            target="_blank" rel="noopener noreferrer" aria-label="ดูช่อง @patternspeakout บน TikTok">
             <span className="tiktok-logo" aria-hidden="true">tt</span>
             ดูช่องต้นฉบับบน TikTok
           </a>
         </div>
       </footer>
 
-      {/* BACK TO TOP */}
-      <button
-        id="backToTop"
-        className={showTop ? "visible" : ""}
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        aria-label="กลับขึ้นด้านบน"
-      >
+      {/* ── BACK TO TOP ── */}
+      <button id="backToTop" className={showTop ? "visible" : ""}
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">
         ↑
       </button>
 
-      {/* MODAL */}
+      {/* ── VIDEO MODAL ── */}
       {selectedVideo && (
-        <Modal
-          video={selectedVideo.video}
-          index={selectedVideo.index}
-          onClose={() => setSelectedVideo(null)}
-        />
+        <VideoModal video={selectedVideo.video} index={selectedVideo.index} onClose={() => setSelectedVideo(null)} />
       )}
 
-      {/* TOAST */}
+      {/* ── TOAST ── */}
       <Toast msg={toast.msg} type={toast.type} />
     </>
   );
