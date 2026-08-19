@@ -1273,9 +1273,6 @@ export default function Home() {
 
       {/* Stats + Deck bar */}
       <div className="status-bar"><div className="status-bar-inner">
-        <div className="deck-page-btn" style={{ cursor: "default", background: "rgba(0,245,212,0.06)", borderColor: "rgba(0,245,212,0.2)", color: "var(--accent-teal)" }}>
-          📊 {loading ? "…" : videos.length} Episodes · A1–C2 · 🇹🇭🇬🇧
-        </div>
         {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
       </div></div>
 
