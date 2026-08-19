@@ -4,9 +4,11 @@ import { supabase } from "@/lib/supabase";
 export const runtime = "nodejs";
 
 /**
- * GET /api/favourites?userId=xxx — Get user's favourites
+ * GET /api/favourites?userId=xxx — Get user's favourites (idioms + words)
  * POST /api/favourites — Add/remove a favourite
- *   Body: { userId, tiktokId, action: "add" | "remove" }
+ *   Body for idiom: { userId, tiktokId, action: "add"|"remove", itemType: "idiom" }
+ *   Body for word:  { userId, tiktokId, action: "add"|"remove", itemType: "word", wordData: {...} }
+ *   tiktokId for words = "word_<word>" (unique key per word)
  */
 
 export async function GET(req: NextRequest) {
@@ -21,19 +23,27 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("favourites")
-    .select("tiktok_id, created_at")
+    .select("tiktok_id, item_type, word_data, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ favourites: (data ?? []).map(f => f.tiktok_id) });
+
+  const idioms = (data ?? []).filter(f => f.item_type === "idiom").map(f => f.tiktok_id);
+  const words = (data ?? []).filter(f => f.item_type === "word").map(f => ({
+    id: f.tiktok_id,
+    data: f.word_data,
+    createdAt: f.created_at,
+  }));
+
+  return NextResponse.json({ favourites: idioms, words });
 }
 
 export async function POST(req: NextRequest) {
-  let body: { userId?: string; tiktokId?: string; action?: string };
+  let body: { userId?: string; tiktokId?: string; action?: string; itemType?: string; wordData?: Record<string, unknown> };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
-  const { userId, tiktokId, action } = body;
+  const { userId, tiktokId, action, itemType = "idiom", wordData } = body;
   if (!userId || !tiktokId || !action) {
     return NextResponse.json({ error: "userId, tiktokId, and action required." }, { status: 400 });
   }
@@ -45,9 +55,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "add") {
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      tiktok_id: tiktokId,
+      item_type: itemType,
+    };
+    if (itemType === "word" && wordData) {
+      row.word_data = wordData;
+    }
+
     const { error } = await supabase.from("favourites").upsert(
-      { user_id: userId, tiktok_id: tiktokId },
-      { onConflict: "user_id,tiktok_id", ignoreDuplicates: true }
+      row,
+      { onConflict: "user_id,tiktok_id,item_type", ignoreDuplicates: true }
     );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: "added" });
@@ -57,7 +76,8 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from("favourites")
       .delete()
       .eq("user_id", userId)
-      .eq("tiktok_id", tiktokId);
+      .eq("tiktok_id", tiktokId)
+      .eq("item_type", itemType);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: "removed" });
   }

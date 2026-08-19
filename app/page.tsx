@@ -400,7 +400,7 @@ function EditModal({ video, token, onClose, onSaved, onToast }: {
 }
 
 // ─── Rich Detail Modal ────────────────────────────────────────────────────────
-function DetailModal({ video, index, onClose }: { video: Video; index: number; onClose: () => void }) {
+function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveWord }: { video: Video; index: number; onClose: () => void; userSession?: { id: string } | null; savedWordIds?: Set<string>; onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void }) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
@@ -451,11 +451,23 @@ function DetailModal({ video, index, onClose }: { video: Video; index: number; o
                 <div className="section-label"><span className="icon">🔄</span>Synonyms &amp; Antonyms</div>
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10, fontWeight: 600 }}>✅ Synonyms (คำพ้องความหมาย)</div>
-                  <div className="word-chips">{data.synonyms.map((s, i) => <span key={i} className="chip chip-syn">{s}</span>)}</div>
+                  <div className="word-chips">{data.synonyms.map((s, i) => {
+                    const sId = `word_${s.toLowerCase().replace(/\s+/g, "_")}`;
+                    const sSaved = savedWordIds?.has(sId);
+                    return <span key={i} className={`chip chip-syn ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
+                      onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: s, cefr: data.cefr, pos: data.partOfSpeech, definitionEN: `Synonym of "${data.idiom}"`, definitionTH: `คำพ้องของ "${data.idiom}"` })}
+                    >{s}{onSaveWord && !sSaved && " +"}</span>;
+                  })}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10, fontWeight: 600 }}>❌ Antonyms (คำตรงข้าม)</div>
-                  <div className="word-chips">{data.antonyms.map((a, i) => <span key={i} className="chip chip-ant">{a}</span>)}</div>
+                  <div className="word-chips">{data.antonyms.map((a, i) => {
+                    const aId = `word_${a.toLowerCase().replace(/\s+/g, "_")}`;
+                    const aSaved = savedWordIds?.has(aId);
+                    return <span key={i} className={`chip chip-ant ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
+                      onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: a, cefr: data.cefr, pos: data.partOfSpeech, definitionEN: `Antonym of "${data.idiom}"`, definitionTH: `คำตรงข้ามของ "${data.idiom}"` })}
+                    >{a}{onSaveWord && !aSaved && " +"}</span>;
+                  })}</div>
                 </div>
               </div>
 
@@ -473,13 +485,23 @@ function DetailModal({ video, index, onClose }: { video: Video; index: number; o
                 <div className="modal-section">
                   <div className="section-label"><span className="icon">🔑</span>Key Words — CEFR Breakdown</div>
                   <div className="keywords-grid">
-                    {data.keyWords.map((kw, i) => (
+                    {data.keyWords.map((kw, i) => {
+                      const wordId = `word_${kw.word.toLowerCase().replace(/\s+/g, "_")}`;
+                      const isSaved = savedWordIds?.has(wordId);
+                      return (
                       <div key={i} className="keyword-card">
                         <div className="keyword-header">
                           <div className="keyword-word">{kw.word}</div>
                           <div className="keyword-badges">
                             <span className={`tag tag-cefr ${kw.cefr}`}>{kw.cefr}</span>
                             <span className="tag tag-pos">{kw.pos}</span>
+                            {onSaveWord && (
+                              <button className={`word-save-btn ${isSaved ? "saved" : ""}`}
+                                onClick={() => !isSaved && onSaveWord(wordId, { word: kw.word, cefr: kw.cefr, pos: kw.pos, definitionEN: kw.definitionEN, definitionTH: kw.definitionTH, synonyms: kw.synonyms, antonyms: kw.antonyms })}
+                                title={isSaved ? "Already in deck" : "Save to deck"}>
+                                {isSaved ? "✅" : "➕"}
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="keyword-def-en">🇬🇧 {kw.definitionEN}</div>
@@ -487,17 +509,30 @@ function DetailModal({ video, index, onClose }: { video: Video; index: number; o
                         {kw.synonyms.length > 0 && (
                           <div className="keyword-syn-row">
                             <div className="keyword-syn-label">Synonyms</div>
-                            <div className="mini-chips">{kw.synonyms.map((s, j) => <span key={j} className="mini-chip mini-chip-syn">{s}</span>)}</div>
+                            <div className="mini-chips">{kw.synonyms.map((s, j) => {
+                              const sId = `word_${s.toLowerCase().replace(/\s+/g, "_")}`;
+                              const sSaved = savedWordIds?.has(sId);
+                              return <span key={j} className={`mini-chip mini-chip-syn ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
+                                onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: s, cefr: kw.cefr, pos: kw.pos, definitionEN: `Synonym of "${kw.word}"`, definitionTH: `คำพ้องของ "${kw.word}"` })}
+                              >{s}{onSaveWord && !sSaved && " +"}</span>;
+                            })}</div>
                           </div>
                         )}
                         {kw.antonyms.length > 0 && (
                           <div className="keyword-ant-row">
                             <div className="keyword-ant-label">Antonyms</div>
-                            <div className="mini-chips">{kw.antonyms.map((a, j) => <span key={j} className="mini-chip mini-chip-ant">{a}</span>)}</div>
+                            <div className="mini-chips">{kw.antonyms.map((a, j) => {
+                              const aId = `word_${a.toLowerCase().replace(/\s+/g, "_")}`;
+                              const aSaved = savedWordIds?.has(aId);
+                              return <span key={j} className={`mini-chip mini-chip-ant ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
+                                onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: a, cefr: kw.cefr, pos: kw.pos, definitionEN: `Antonym of "${kw.word}"`, definitionTH: `คำตรงข้ามของ "${kw.word}"` })}
+                              >{a}{onSaveWord && !aSaved && " +"}</span>;
+                            })}</div>
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -562,10 +597,12 @@ interface SidePanelProps {
   adminToken: string;
   videos: Video[];
   favourites: Set<string>;
+  savedWords: Array<{ id: string; data: Record<string, unknown> }>;
   onToggleFav: (tiktokId: string) => void;
+  onRemoveWord: (wordId: string) => void;
 }
 
-function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, onToggleFav }: SidePanelProps) {
+function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord }: SidePanelProps) {
   const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users">("login");
   // Login
   const [loginEmail, setLoginEmail] = useState("");
@@ -747,28 +784,60 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           {/* ─── Deck tab ─── */}
           {userSession && tab === "deck" && (
             <div>
-              <div className="admin-section-label">💾 My Deck ({deckVideos.length} saved)</div>
-              {deckVideos.length === 0 ? (
-                <p className="admin-hint" style={{ textAlign: "center", padding: 24 }}>ยังไม่มี idiom ใน deck — กด ❤️ บนการ์ดเพื่อบันทึก</p>
-              ) : (
-                <div className="admin-episode-list">
-                  {deckVideos.map(v => {
-                    const d = getIdiomData(v);
-                    return (
-                      <div key={v.tiktok_id} className="admin-ep-row">
-                        <div className="admin-ep-info">
-                          <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
-                          <div>
-                            <div className="admin-ep-name">{d?.idiom ?? v.title}</div>
-                            <div className="admin-ep-meta">{d?.cefr ?? ""} · {d?.partOfSpeech ?? ""}</div>
+              <div className="admin-section-label">💾 My Deck</div>
+
+              {/* Saved Idioms */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>❤️ Saved Idioms ({deckVideos.length})</div>
+                {deckVideos.length === 0 ? (
+                  <p className="admin-hint">กด ❤️ บนการ์ดเพื่อบันทึก idiom</p>
+                ) : (
+                  <div className="admin-episode-list">
+                    {deckVideos.map(v => {
+                      const d = getIdiomData(v);
+                      return (
+                        <div key={v.tiktok_id} className="admin-ep-row">
+                          <div className="admin-ep-info">
+                            <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
+                            <div>
+                              <div className="admin-ep-name">{d?.idiom ?? v.title}</div>
+                              <div className="admin-ep-meta">{d?.cefr ?? ""} · {d?.partOfSpeech ?? ""}</div>
+                            </div>
                           </div>
+                          <button className="admin-ep-btn delete" onClick={() => onToggleFav(v.tiktok_id)} title="Remove">✕</button>
                         </div>
-                        <button className="admin-ep-btn delete" onClick={() => onToggleFav(v.tiktok_id)} title="Remove from deck">✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Saved Words */}
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>📝 Saved Words ({savedWords.length})</div>
+                {savedWords.length === 0 ? (
+                  <p className="admin-hint">กดคำศัพท์ในรายละเอียด idiom เพื่อบันทึกลง deck</p>
+                ) : (
+                  <div className="admin-episode-list">
+                    {savedWords.map(w => {
+                      const wd = w.data as { word?: string; cefr?: string; definitionEN?: string; definitionTH?: string };
+                      return (
+                        <div key={w.id} className="admin-ep-row">
+                          <div className="admin-ep-info">
+                            <span className="admin-ep-emoji">📝</span>
+                            <div>
+                              <div className="admin-ep-name">{wd.word ?? w.id}</div>
+                              <div className="admin-ep-meta" style={{ color: "var(--accent-teal)" }}>{wd.cefr ?? ""} · {wd.definitionEN?.slice(0, 40) ?? ""}</div>
+                              <div className="admin-ep-meta" style={{ color: "var(--accent-yellow)" }}>{wd.definitionTH?.slice(0, 40) ?? ""}</div>
+                            </div>
+                          </div>
+                          <button className="admin-ep-btn delete" onClick={() => onRemoveWord(w.id)} title="Remove">✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -872,6 +941,7 @@ export default function Home() {
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [userSession, setUserSession] = useState<{ id: string; email: string; displayName: string; role: "admin"|"user" } | null>(null);
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  const [savedWords, setSavedWords] = useState<Array<{ id: string; data: Record<string, unknown> }>>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -952,11 +1022,11 @@ export default function Home() {
           else if (role === "user" && t) {
             setAdminToken("");
             // Fetch user info from token (user UUID)
-            fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); });
+            fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); if (d.words) setSavedWords(d.words); });
             setUserSession({ id: t, email: "", displayName: "User", role: "user" });
-          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); }
+          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]); }
         }}
-        userSession={userSession} adminToken={adminToken} videos={videos} favourites={favourites}
+        userSession={userSession} adminToken={adminToken} videos={videos} favourites={favourites} savedWords={savedWords}
         onToggleFav={async (tiktokId) => {
           if (!userSession) return;
           const isFav = favourites.has(tiktokId);
@@ -964,6 +1034,13 @@ export default function Home() {
           try {
             await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId, action }) });
             setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(tiktokId); else next.add(tiktokId); return next; });
+          } catch { /* ignore */ }
+        }}
+        onRemoveWord={async (wordId) => {
+          if (!userSession) return;
+          try {
+            await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "remove", itemType: "word" }) });
+            setSavedWords(prev => prev.filter(w => w.id !== wordId));
           } catch { /* ignore */ }
         }}
       />
@@ -1049,7 +1126,17 @@ export default function Home() {
       </footer>
 
       <button id="backToTop" className={showTop ? "visible" : ""} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">↑</button>
-      {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} onClose={() => setSelectedVideo(null)} />}
+      {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} onClose={() => setSelectedVideo(null)}
+        userSession={userSession}
+        savedWordIds={new Set(savedWords.map(w => w.id))}
+        onSaveWord={userSession ? async (wordId, wordData) => {
+          try {
+            await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
+            setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
+            showToast(`📝 "${(wordData as {word?:string}).word}" saved to deck!`, "success");
+          } catch { /* ignore */ }
+        } : undefined}
+      />}
       {editingVideo && <EditModal video={editingVideo} token={adminToken} onClose={() => setEditingVideo(null)} onSaved={() => fetchVideos(true)} onToast={showToast} />}
       <Toast msg={toast.msg} type={toast.type} />
     </>
