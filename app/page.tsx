@@ -1174,6 +1174,21 @@ export default function Home() {
   // Compute episode numbers: oldest = EP.001 within each category
   useEffect(() => {
     const map = new Map<string, number>();
+    const categories = ["idiom", "howtosay", "motto"];
+    for (const cat of categories) {
+      const catVideos = videos.filter(v => {
+        const d = getIdiomData(v);
+        return (d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom") === cat;
+      });
+      catVideos.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
+      catVideos.forEach((v, i) => map.set(v.tiktok_id, i + 1));
+    }
+    setEpMap(map);
+  }, [videos]);
+
+  // Compute episode numbers: oldest = EP.001 within each category
+  useEffect(() => {
+    const map = new Map<string, number>();
     const grouped: Record<string, Video[]> = {};
     for (const v of videos) {
       const d = getIdiomData(v);
@@ -1323,8 +1338,10 @@ export default function Home() {
             const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Motto Motivation" : cat;
             return (
             <VideoCard key={video.id} video={video} index={i}
-              onClick={() => { setSelectedVideo({ video, index: i }); trackEvent("card_click", { tiktokId: video.tiktok_id, title: getIdiomData(video)?.idiom ?? video.title }); }}
+              onClick={() => setSelectedVideo({ video, index: i })}
               isAdmin={!!adminToken}
+              epNumber={epMap.get(video.tiktok_id) ?? (i + 1)}
+              categoryLabel={catLabel}
               onEdit={() => setEditingVideo(video)}
               onDelete={async () => {
                 const data = getIdiomData(video);
@@ -1345,11 +1362,8 @@ export default function Home() {
                 try {
                   await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: video.tiktok_id, action }) });
                   setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(video.tiktok_id); else next.add(video.tiktok_id); return next; });
-                  trackEvent(isFav ? "favourite_remove" : "favourite_add", { tiktokId: video.tiktok_id, title: getIdiomData(video)?.idiom ?? video.title });
                 } catch { /* ignore */ }
               } : undefined}
-              epNumber={epMap.get(video.tiktok_id) ?? (i + 1)}
-              categoryLabel={catLabel}
             />
             );
           })}
