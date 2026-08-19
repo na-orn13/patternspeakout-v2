@@ -715,17 +715,51 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   // Deck: get favourite videos
   const deckVideos = videos.filter(v => favourites.has(v.tiktok_id));
 
-  const sampleJson = `{
+  const sampleJson = addCategory === "howtosay" ? `{
+  "idiom": "How to say 'I disagree' politely",
+  "cefr": "B1",
+  "partOfSpeech": "phrase",
+  "category": "howtosay",
+  "date": "${new Date().toISOString().split("T")[0]}",
+  "thumbnail": "🗣️",
+  "color": "#4ECDC4",
+  "tiktokUrl": "",
+  "definitionEN": "Polite ways to express disagreement in English.",
+  "definitionTH": "วิธีพูดไม่เห็นด้วยอย่างสุภาพในภาษาอังกฤษ",
+  "synonyms": ["I see it differently", "I'm not sure about that", "I respectfully disagree"],
+  "antonyms": ["I totally agree", "Absolutely", "You're right"],
+  "keyWords": [{"word":"disagree","cefr":"A2","pos":"verb","definitionEN":"To have a different opinion","definitionTH":"ไม่เห็นด้วย","synonyms":["differ","oppose"],"antonyms":["agree"]}],
+  "examples": [{"en":"I see your point, but I respectfully disagree.","th":"ฉันเข้าใจมุมของคุณ แต่ฉันไม่เห็นด้วยค่ะ"}],
+  "usage": "Formal & Semi-formal",
+  "context": "Work, meetings, discussions"
+}` : addCategory === "motto" ? `{
+  "idiom": "No pain, no gain",
+  "cefr": "A2",
+  "partOfSpeech": "proverb",
+  "category": "motto",
+  "date": "${new Date().toISOString().split("T")[0]}",
+  "thumbnail": "💪",
+  "color": "#FFE66D",
+  "tiktokUrl": "",
+  "definitionEN": "You have to work hard and suffer to achieve something worthwhile.",
+  "definitionTH": "ไม่มีความเจ็บปวด ก็ไม่มีความสำเร็จ — ต้องอดทนทำงานหนักถึงจะได้ผลลัพธ์ที่ดี",
+  "synonyms": ["no cross, no crown", "nothing ventured, nothing gained"],
+  "antonyms": ["easy come, easy go"],
+  "keyWords": [{"word":"gain","cefr":"A2","pos":"noun/verb","definitionEN":"Something achieved; to obtain","definitionTH":"สิ่งที่ได้มา / ได้รับ","synonyms":["profit","achieve"],"antonyms":["loss","lose"]}],
+  "examples": [{"en":"I trained every day for months. No pain, no gain!","th":"ฉันฝึกทุกวันเป็นเดือน ไม่เจ็บก็ไม่ได้ผล!"}],
+  "usage": "Informal",
+  "context": "Motivation, fitness, self-improvement"
+}` : `{
   "idiom": "Hit the nail on the head",
   "cefr": "B2",
   "partOfSpeech": "verb phrase",
-  "category": "${addCategory}",
-  "date": "2024-01-08",
+  "category": "idiom",
+  "date": "${new Date().toISOString().split("T")[0]}",
   "thumbnail": "🎯",
   "color": "#FF6B6B",
   "tiktokUrl": "",
-  "definitionEN": "To be precisely correct.",
-  "definitionTH": "พูดถูกต้องแม่นยำ",
+  "definitionEN": "To be precisely correct about something.",
+  "definitionTH": "พูดถูกต้องแม่นยำ / ตรงประเด็น",
   "synonyms": ["be spot on", "be exactly right"],
   "antonyms": ["miss the point"],
   "keyWords": [{"word":"nail","cefr":"A1","pos":"noun","definitionEN":"A metal spike","definitionTH":"ตะปู","synonyms":["pin"],"antonyms":[]}],
@@ -857,11 +891,19 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                 <p className="admin-hint">ส่ง prompt นี้ให้ ChatGPT เพื่อสร้าง JSON ให้คุณ:</p>
                 <div style={{ position: "relative" }}>
                   <button className="copy-btn" onClick={() => {
-                    const text = `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
-                    navigator.clipboard.writeText(text).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
+                    const prompt = addCategory === "howtosay"
+                      ? `Please create a JSON object for the English phrase "[PHRASE]" about how to say something, with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations. The "idiom" field should contain the phrase/topic.`
+                      : addCategory === "motto"
+                      ? `Please create a JSON object for the motivational quote/motto "[MOTTO]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations. The "idiom" field should contain the motto.`
+                      : `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
+                    navigator.clipboard.writeText(prompt).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
                   }} aria-label="Copy">📋 Copy</button>
                   <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
-                    {`Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`}
+                    {addCategory === "howtosay"
+                      ? `Please create a JSON for the phrase "[PHRASE]" with this structure:\n${sampleJson}\n\nThe "idiom" field = the phrase topic. Fill all fields. Use Thai for TH fields.`
+                      : addCategory === "motto"
+                      ? `Please create a JSON for the motto "[MOTTO]" with this structure:\n${sampleJson}\n\nThe "idiom" field = the motto. Fill all fields. Use Thai for TH fields.`
+                      : `Please create a JSON for the idiom "[IDIOM]" with this structure:\n${sampleJson}\n\nFill all fields with accurate data. Use Thai for TH fields.`}
                   </div>
                 </div>
               </div>
