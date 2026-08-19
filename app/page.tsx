@@ -735,52 +735,6 @@ function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelPro
                 </form>
               </div>
 
-              {/* Episode list with edit/delete */}
-              <div className="admin-card">
-                <div className="admin-section-label">📚 จัดการ Episodes ({episodes.length})</div>
-                <div className="admin-episode-list">
-                  {episodes.map((ep) => {
-                    const d = ep.idiomData;
-                    return (
-                      <div key={ep.tiktok_id} className="admin-ep-row">
-                        <div className="admin-ep-info">
-                          <span className="admin-ep-emoji">{d?.thumbnail ?? "📖"}</span>
-                          <div>
-                            <div className="admin-ep-name">{d?.idiom ?? ep.title}</div>
-                            <div className="admin-ep-meta">{d?.episode ?? ""} · {d?.cefr ?? ""}</div>
-                          </div>
-                        </div>
-                        <div className="admin-ep-actions">
-                          <button className="admin-ep-btn edit" onClick={() => handleEditStart(ep)} title="Edit">✏️</button>
-                          <button className="admin-ep-btn delete" onClick={() => handleDelete(ep.tiktok_id, d?.idiom ?? ep.title)} title="Delete">🗑️</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {episodes.length === 0 && <p className="admin-hint" style={{ textAlign: "center", padding: 16 }}>ยังไม่มี Episode</p>}
-                </div>
-              </div>
-
-              {/* Edit modal */}
-              {editingEp && (
-                <div className="admin-card" style={{ border: "1px solid var(--accent)", background: "rgba(255,45,85,0.04)" }}>
-                  <div className="admin-section-label">✏️ Editing: {editingEp.idiomData?.idiom ?? editingEp.title}</div>
-                  <div className="admin-field">
-                    <textarea className="admin-input" style={{ minHeight: 250, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
-                      value={editJson} onChange={(e) => setEditJson(e.target.value)} />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="admin-action-btn" onClick={handleEditSave} disabled={editSaving}>
-                      {editSaving ? <><span className="spin">↻</span> Saving…</> : <>💾 Save</>}
-                    </button>
-                    <button className="admin-action-btn" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }} onClick={() => setEditingEp(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                  {editResult && <div className={`admin-result ${editResult.startsWith("✅") ? "ok" : "err"}`}>{editResult}</div>}
-                </div>
-              )}
-
               {/* Template */}
               <div className="admin-card">
                 <div className="admin-section-label">📋 JSON Template</div>
