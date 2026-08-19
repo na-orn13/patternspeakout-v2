@@ -16,6 +16,7 @@ interface KeyWord {
 interface RichWord {
   word: string;
   meaningTH: string;
+  meaningEN?: string;
   pos?: string;
   example?: string;
 }
