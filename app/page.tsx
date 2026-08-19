@@ -656,9 +656,12 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
     finally { setUsersLoading(false); }
   };
 
-  const handleUserAction = async (userId: string, action: string, expiresAt?: string) => {
+  const handleUserAction = async (userId: string, action: string, extraValue?: string) => {
     try {
-      const res = await fetch("/api/users/manage", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ userId, action, expiresAt }) });
+      const body: Record<string, unknown> = { userId, action };
+      if (action === "set_expiry") body.expiresAt = extraValue || null;
+      if (action === "reset_password") body.newPassword = extraValue;
+      const res = await fetch("/api/users/manage", { method: "POST", headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
       if (res.ok) { onToast(`✅ ${data.message}`, "success"); fetchUsers(); }
       else onToast(`❌ ${data.error}`, "error");
@@ -828,6 +831,12 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                         <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => {
                           if (confirm(`Permanently delete ${u.email}? This cannot be undone.`)) handleUserAction(u.id, "delete");
                         }}>🗑️ Delete</button>
+                        <button className="edit-add-btn" onClick={() => {
+                          const pw = prompt(`Set new password for ${u.email} (min 6 chars):`);
+                          if (!pw) return;
+                          if (pw.length < 6) { onToast("Password must be at least 6 characters.", "error"); return; }
+                          handleUserAction(u.id, "reset_password", pw);
+                        }}>🔑 Reset Password</button>
                       </div>
                     </div>
                   ))}

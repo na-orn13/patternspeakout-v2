@@ -30,10 +30,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
-  let body: { userId?: string; action?: string; expiresAt?: string | null };
+  let body: { userId?: string; action?: string; expiresAt?: string | null; newPassword?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
-  const { userId, action, expiresAt } = body;
+  const { userId, action, expiresAt, newPassword } = body;
   if (!userId || !action) return NextResponse.json({ error: "userId and action required." }, { status: 400 });
 
   switch (action) {
@@ -56,6 +56,16 @@ export async function POST(req: NextRequest) {
       const { error } = await supabase.from("app_users").delete().eq("id", userId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, message: "User permanently deleted." });
+    }
+    case "reset_password": {
+      if (!newPassword || newPassword.length < 6) {
+        return NextResponse.json({ error: "New password must be at least 6 characters." }, { status: 400 });
+      }
+      const crypto = await import("crypto");
+      const hash = crypto.createHash("sha256").update(newPassword).digest("hex");
+      const { error } = await supabase.from("app_users").update({ password_hash: hash }).eq("id", userId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, message: "Password reset successfully." });
     }
     default:
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
