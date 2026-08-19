@@ -928,19 +928,24 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                 <p className="admin-hint">ส่ง prompt นี้ให้ ChatGPT เพื่อสร้าง JSON ให้คุณ:</p>
                 <div style={{ position: "relative" }}>
                   <button className="copy-btn" onClick={() => {
-                    const prompt = addCategory === "howtosay"
-                      ? `Please create a JSON object for the English phrase "[PHRASE]" about how to say something, with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations. The "idiom" field should contain the phrase/topic.`
-                      : addCategory === "motto"
-                      ? `Please create a JSON object for the motivational quote/motto "[MOTTO]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations. The "idiom" field should contain the motto.`
-                      : `Please create a JSON object for the English idiom "[IDIOM]" with this exact structure:\n${sampleJson}\n\nFill in all fields with accurate data. Use Thai for definitionTH and example translations.`;
+                    const categoryWord = addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "motto/quote" : "idiom";
+                    const prompt = `Create a JSON object for the English ${categoryWord} "[REPLACE THIS WITH THE ${categoryWord.toUpperCase()}]".
+
+RULES:
+- Output ONLY the raw JSON. No explanation, no markdown, no code fences.
+- Every synonym and antonym MUST have "meaningTH" (Thai meaning).
+- Every keyWord's synonyms and antonyms MUST also have "meaningTH".
+- Every example MUST have both "en" and "th".
+- Keep the "idiom" field name even if it's a phrase or motto.
+- Include 3-5 synonyms, 3-5 antonyms, 2-3 keyWords, and 3 examples.
+- Use today's date for "date" field.
+
+EXACT FORMAT (copy this structure):
+${sampleJson}`;
                     navigator.clipboard.writeText(prompt).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
                   }} aria-label="Copy">📋 Copy</button>
                   <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
-                    {addCategory === "howtosay"
-                      ? `Please create a JSON for the phrase "[PHRASE]" with this structure:\n${sampleJson}\n\nThe "idiom" field = the phrase topic. Fill all fields. Use Thai for TH fields.`
-                      : addCategory === "motto"
-                      ? `Please create a JSON for the motto "[MOTTO]" with this structure:\n${sampleJson}\n\nThe "idiom" field = the motto. Fill all fields. Use Thai for TH fields.`
-                      : `Please create a JSON for the idiom "[IDIOM]" with this structure:\n${sampleJson}\n\nFill all fields with accurate data. Use Thai for TH fields.`}
+                    {`📋 Click "Copy" above → Paste in ChatGPT → Replace "[REPLACE THIS...]" with your ${addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "motto" : "idiom"} → ChatGPT gives you paste-ready JSON → Paste it in the box above`}
                   </div>
                 </div>
               </div>
