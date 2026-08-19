@@ -89,7 +89,7 @@ async function sendAdminNotification(userEmail: string, fullName: string, age: n
           </table>
           <p>To approve this user:</p>
           <ol>
-            <li>Go to <a href="https://patternspeakout-v2.vercel.app">patternspeakout-v2.vercel.app</a></li>
+            <li>Go to <a href="https://patternspeakout.vercel.app">patternspeakout.vercel.app</a></li>
             <li>Sign in as admin (☰ button)</li>
             <li>Open 👥 Users tab</li>
             <li>Click ✅ Approve next to this user</li>
