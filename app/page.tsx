@@ -814,15 +814,17 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                           {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("th-TH")}</div>}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                         {u.status === "pending" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>✅ Approve</button>}
                         {u.status === "approved" && <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => handleUserAction(u.id, "remove")}>🚫 Remove</button>}
                         {u.status === "removed" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>↩️ Reactivate</button>}
-                        <button className="edit-add-btn" onClick={() => {
-                          const d = prompt("Set expiry date (YYYY-MM-DD) or leave empty to remove expiry:");
-                          if (d === null) return;
-                          handleUserAction(u.id, "set_expiry", d || undefined);
-                        }}>📅 Set Expiry</button>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <input type="date" className="edit-input" style={{ width: 140, padding: "4px 8px", fontSize: 11 }}
+                            defaultValue={u.expires_at ? u.expires_at.split("T")[0] : ""}
+                            onChange={(e) => handleUserAction(u.id, "set_expiry", e.target.value || undefined)}
+                          />
+                          {u.expires_at && <button className="edit-remove-btn" style={{ width: 22, height: 22, fontSize: 10 }} onClick={() => handleUserAction(u.id, "set_expiry")} title="Remove expiry">✕</button>}
+                        </span>
                         <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => {
                           if (confirm(`Permanently delete ${u.email}? This cannot be undone.`)) handleUserAction(u.id, "delete");
                         }}>🗑️ Delete</button>
