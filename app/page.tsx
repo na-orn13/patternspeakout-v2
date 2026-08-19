@@ -720,7 +720,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
 
               {tab === "login" && (
                 <form className="admin-login-form" onSubmit={handleLogin}>
-                  <div className="admin-field"><label className="admin-label" htmlFor="sp-email">Email or Username</label><input id="sp-email" className="admin-input" type="text" autoComplete="username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required autoFocus /></div>
+                  <div className="admin-field"><label className="admin-label" htmlFor="sp-email">Email</label><input id="sp-email" className="admin-input" type="text" autoComplete="username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required autoFocus /></div>
                   <div className="admin-field"><label className="admin-label" htmlFor="sp-pass">Password</label><input id="sp-pass" className="admin-input" type="password" autoComplete="current-password" value={loginPass} onChange={e => setLoginPass(e.target.value)} required /></div>
                   {loginError && <div className="admin-error">{loginError}</div>}
                   <button className="admin-login-btn" type="submit" disabled={loginLoading}>{loginLoading ? <><span className="spin">↻</span> Signing in…</> : <>🔓 Sign in</>}</button>
