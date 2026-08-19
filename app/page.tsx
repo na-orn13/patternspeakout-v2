@@ -702,13 +702,12 @@ function AdminPanel({ open, onClose, onToast, onRefresh, onAuth }: AdminPanelPro
       <div className={`admin-backdrop ${open ? "open" : ""}`} onClick={onClose} aria-hidden="true" />
       <aside className={`admin-panel ${open ? "open" : ""}`} aria-label="Admin panel">
         <div className="admin-panel-header">
-          <div className="admin-panel-title"><span>⚙️</span><span>Admin Panel</span></div>
+          <div className="admin-panel-title"><span>⚙️</span><span>Sign in</span></div>
           <button className="admin-panel-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="admin-panel-body">
           {!authed ? (
             <form className="admin-login-form" onSubmit={handleLogin}>
-              <div className="admin-section-label">🔐 Sign in to manage</div>
               <div className="admin-field"><label className="admin-label" htmlFor="ap-user">Username</label><input id="ap-user" className="admin-input" type="text" autoComplete="username" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} required autoFocus /></div>
               <div className="admin-field"><label className="admin-label" htmlFor="ap-pass">Password</label><input id="ap-pass" className="admin-input" type="password" autoComplete="current-password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} required /></div>
               {loginError && <div className="admin-error">{loginError}</div>}
@@ -893,7 +892,7 @@ export default function Home() {
             <div className="error-state"><span style={{ fontSize: 48 }}>⚠️</span><h3>ไม่สามารถโหลดข้อมูลได้</h3><p>{error}</p><button className="retry-btn" onClick={() => fetchVideos()}>ลองอีกครั้ง</button></div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มี Idiom"}</h3><p>{search ? "ลองค้นหาด้วยคำอื่น" : "เปิด Admin Panel (☰) แล้วเพิ่ม Idiom ใหม่"}</p></div>
+            <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มี Idiom"}</h3><p>{search ? "ลองค้นหาด้วยคำอื่น" : "Sign in (☰) แล้วเพิ่ม Idiom ใหม่"}</p></div>
           )}
           {!loading && !error && filtered.map((video, i) => (
             <VideoCard key={video.id} video={video} index={i}
