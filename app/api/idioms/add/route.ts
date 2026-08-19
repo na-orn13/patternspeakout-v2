@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     comment_count: 0,
     share_count: 0,
     summary: JSON.stringify(body),
-    summary_source: "structured",
+    summary_source: "manual",
     synced_at: new Date().toISOString(),
   };
 
