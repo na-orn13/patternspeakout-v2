@@ -130,18 +130,29 @@ export async function POST(req: NextRequest) {
     let regenerated = 0;
     // Process in batches of 3 to stay within function timeout
     const BATCH = 3;
+    let rateLimited = false;
     for (let i = 0; i < needsRegen.length && i < BATCH; i++) {
       const row = needsRegen[i];
-      const result = await summariseFromCaption(row.caption, row.title);
-      if (result) {
-        await supabase
-          .from("videos")
-          .update({ summary: result.summary, summary_source: result.source, synced_at: new Date().toISOString() })
-          .eq("tiktok_id", row.tiktok_id);
-        regenerated++;
+      try {
+        const result = await summariseFromCaption(row.caption, row.title);
+        if (result) {
+          await supabase
+            .from("videos")
+            .update({ summary: result.summary, summary_source: result.source, synced_at: new Date().toISOString() })
+            .eq("tiktok_id", row.tiktok_id);
+          regenerated++;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("rate") || msg.includes("429")) {
+          console.warn("[sync] Gemini rate limit hit — stopping summary regen for this pass.");
+          rateLimited = true;
+          break;
+        }
+        console.error(`[sync] Summary error for ${row.tiktok_id}:`, msg);
       }
     }
-    const remaining = Math.max(0, needsRegen.length - BATCH);
+    const remaining = Math.max(0, needsRegen.length - regenerated);
 
     for (const video of existingCandidates) {
       await supabase
@@ -163,6 +174,7 @@ export async function POST(req: NextRequest) {
       updatedStats: existingCandidates.length,
       regeneratedSummaries: regenerated,
       remainingStale: remaining,
+      rateLimited: rateLimited || false,
       source: tiktokToken ? "tiktok_api" : "seed",
     });
   } catch (err: unknown) {
