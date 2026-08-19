@@ -837,7 +837,7 @@ export default function Home() {
       {/* HERO */}
       <header className="hero">
         <div className="particles" ref={particlesRef} aria-hidden="true" />
-        <div className="channel-badge"><span className="tiktok-logo">tt</span>@patternspeakout &nbsp;·&nbsp; Idiom of the Day</div>
+        <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout &nbsp;·&nbsp; Idiom of the Day</a>
         <h1><span className="gradient-text">Idiom of the Day</span><br />Vlog Summary</h1>
         <p className="subtitle">สรุปทุก Episode จาก TikTok <strong>@patternspeakout</strong> — เรียนรู้ Idiom ภาษาอังกฤษพร้อมระดับ CEFR, ความหมายไทย–อังกฤษ, Synonyms, Antonyms และตัวอย่างประโยค</p>
         <div className="hero-stats">
