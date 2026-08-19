@@ -139,11 +139,12 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
+  const cefrColor = data?.cefr ? ({ A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" }[data.cefr] ?? color) : color;
   const epNum = data?.episode ?? `EP.${String(index + 1).padStart(3, "0")}`;
 
   return (
-    <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s` }}>
-      <div className="card-accent-line" style={{ background: color }} />
+    <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s`, borderColor: `${cefrColor}40` }}>
+      <div className="card-accent-line" style={{ background: cefrColor }} />
 
       {/* Admin overlay buttons */}
       {isAdmin && (
