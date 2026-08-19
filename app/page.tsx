@@ -132,16 +132,16 @@ function Toast({ msg, type }: { msg: string; type: "success" | "error" | "" }) {
 }
 
 // ─── Video Card ───────────────────────────────────────────────────────────────
-function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, onFav }: {
+function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, onFav, epNumber, categoryLabel }: {
   video: Video; index: number; onClick: () => void;
   isAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
   isFav?: boolean; onFav?: () => void;
+  epNumber: number; categoryLabel: string;
 }) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
   const cefrColor = data?.cefr ? ({ A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" }[data.cefr] ?? color) : color;
-  const epNum = `EP.${String(index + 1).padStart(3, "0")}`;
 
   return (
     <div className="idiom-card" style={{ animationDelay: `${Math.min(index, 5) * 0.06}s`, borderColor: `${cefrColor}40` }}>
@@ -167,7 +167,8 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
         <div className="card-header">
           <div className="card-emoji" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>{emoji}</div>
           <div className="card-meta">
-            <div className="card-episode">{epNum}</div>
+            <div className="card-episode">{categoryLabel}</div>
+            <div className="card-episode">EP.{String(epNumber).padStart(3, "0")}</div>
             <div className="card-idiom-title">{data?.idiom ?? video.title}</div>
             <div className="card-tags">
               {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
@@ -973,6 +974,7 @@ export default function Home() {
   const [addCategory, setAddCategory] = useState("idiom");
   const [selectedVideo, setSelectedVideo] = useState<{ video: Video; index: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
+  const [epMap, setEpMap] = useState<Map<string, number>>(new Map());
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
@@ -1034,6 +1036,21 @@ export default function Home() {
     }
     setFiltered(result);
   }, [videos, search, sort, cefrFilter, category]);
+
+  // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
+  useEffect(() => {
+    const map = new Map<string, number>();
+    const categories = ["idiom", "howtosay", "motto"];
+    for (const cat of categories) {
+      const catVideos = videos.filter(v => {
+        const d = getIdiomData(v);
+        return (d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom") === cat;
+      });
+      catVideos.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
+      catVideos.forEach((v, i) => map.set(v.tiktok_id, i + 1));
+    }
+    setEpMap(map);
+  }, [videos]);
 
   // Particles
   const particlesRef = useRef<HTMLDivElement>(null);
@@ -1148,7 +1165,11 @@ export default function Home() {
           {!loading && !error && filtered.length === 0 && (
             <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มี Idiom"}</h3><p>{search ? "ลองค้นหาด้วยคำอื่น" : "Sign in (☰) แล้วเพิ่ม Idiom ใหม่"}</p></div>
           )}
-          {!loading && !error && filtered.map((video, i) => (
+          {!loading && !error && filtered.map((video, i) => {
+            const d = getIdiomData(video);
+            const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
+            const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Motto Motivation" : cat;
+            return (
             <VideoCard key={video.id} video={video} index={i}
               onClick={() => setSelectedVideo({ video, index: i })}
               isAdmin={!!adminToken}
@@ -1174,8 +1195,11 @@ export default function Home() {
                   setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(video.tiktok_id); else next.add(video.tiktok_id); return next; });
                 } catch { /* ignore */ }
               } : undefined}
+              epNumber={epMap.get(video.tiktok_id) ?? (i + 1)}
+              categoryLabel={catLabel}
             />
-          ))}
+            );
+          })}
         </div>
       </main>
 
