@@ -87,7 +87,7 @@ export default function StatsPage() {
                         <span className="admin-ep-emoji" style={{ fontSize: 14, width: 24 }}>{i + 1}.</span>
                         <div><div className="admin-ep-name">{ep.title}</div></div>
                       </div>
-                      <span style={{ fontSize: 12, color: "var(--accent-teal)", fontFamily: "var(--font-mono)" }}>{ep.clicks} clicks</span>
+                      <span style={{ fontSize: 12, color: "var(--slate)", fontFamily: "var(--font-mono)" }}>{ep.clicks} clicks</span>
                     </div>
                   ))}
                 </div>
@@ -105,7 +105,7 @@ export default function StatsPage() {
                         <span className="admin-ep-emoji" style={{ fontSize: 14, width: 24 }}>{i + 1}.</span>
                         <div><div className="admin-ep-name">{f.name}</div></div>
                       </div>
-                      <span style={{ fontSize: 12, color: "var(--accent2)", fontFamily: "var(--font-mono)" }}>{f.saves} saves</span>
+                      <span style={{ fontSize: 12, color: "var(--coral)", fontFamily: "var(--font-mono)" }}>{f.saves} saves</span>
                     </div>
                   ))}
                 </div>

@@ -607,7 +607,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
               {video.share_url && video.share_url !== "https://www.tiktok.com/@patternspeakout" && (
                 <div className="modal-section">
                   <a href={video.share_url} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 18px", background: "rgba(255,45,85,0.1)", border: "1px solid rgba(255,45,85,0.3)", borderRadius: 100, color: "var(--accent2)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 18px", background: "var(--off-white)", border: "1px solid var(--border)", borderRadius: 4, color: "var(--slate)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                     🎵 ดูวิดีโอต้นฉบับบน TikTok
                   </a>
                 </div>
@@ -620,7 +620,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
               <div className="def-box en"><div className="def-text" style={{ whiteSpace: "pre-wrap" }}>{video.caption}</div></div>
               {video.share_url && (
                 <a href={video.share_url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "10px 18px", background: "rgba(255,45,85,0.1)", border: "1px solid rgba(255,45,85,0.3)", borderRadius: 100, color: "var(--accent2)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "10px 18px", background: "var(--off-white)", border: "1px solid var(--border)", borderRadius: 4, color: "var(--slate)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                   🎵 ดูวิดีโอบน TikTok
                 </a>
               )}
@@ -916,7 +916,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                 {savedWords.length === 0 ? (
                   <p className="admin-hint">กดคำศัพท์ในรายละเอียด idiom เพื่อบันทึก</p>
                 ) : (
-                  <p className="admin-hint">{savedWords.length} words saved — <a href="/deck" style={{ color: "var(--accent-teal)" }}>open deck</a> to review</p>
+                  <p className="admin-hint">{savedWords.length} words saved — <a href="/deck" style={{ color: "var(--slate)" }}>open deck</a> to review</p>
                 )}
               </div>
             </div>
@@ -961,7 +961,7 @@ EXACT FORMAT (copy this structure):
 ${sampleJson}`;
                     navigator.clipboard.writeText(prompt).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
                   }} aria-label="Copy">📋 Copy</button>
-                  <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+                  <div style={{ background: "var(--off-white)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--slate)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
                     {`📋 Click "Copy" above → Paste in ChatGPT → Replace "[REPLACE THIS...]" with your ${addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "inspiring quote" : "idiom"} → ChatGPT gives you paste-ready JSON → Paste it in the box above`}
                   </div>
                 </div>
@@ -980,13 +980,13 @@ ${sampleJson}`;
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <div className="admin-ep-name">{u.full_name || u.display_name || u.email}</div>
-                          <div className="admin-ep-meta">{u.email} · {u.phone ? `📱${u.phone}` : ""} · {u.age ? `${u.age}y` : ""} · <span style={{ color: u.status === "approved" ? "var(--accent-teal)" : u.status === "pending" ? "var(--accent-yellow)" : "var(--accent2)" }}>{u.status}</span></div>
+                          <div className="admin-ep-meta">{u.email} · {u.phone ? `📱${u.phone}` : ""} · {u.age ? `${u.age}y` : ""} · <span style={{ color: u.status === "approved" ? "#27ae60" : u.status === "pending" ? "var(--orange)" : "var(--coral)" }}>{u.status}</span></div>
                           {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("th-TH")}</div>}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                         {u.status === "pending" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>✅ Approve</button>}
-                        {u.status === "approved" && <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => handleUserAction(u.id, "remove")}>🚫 Remove</button>}
+                        {u.status === "approved" && <button className="edit-add-btn" style={{ borderColor: "var(--coral)", color: "var(--coral)", background: "rgba(241,122,126,0.06)" }} onClick={() => handleUserAction(u.id, "remove")}>🚫 Remove</button>}
                         {u.status === "removed" && <button className="edit-add-btn" onClick={() => handleUserAction(u.id, "approve")}>↩️ Reactivate</button>}
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <input type="date" className="edit-input" style={{ width: 140, padding: "4px 8px", fontSize: 11 }}
@@ -995,7 +995,7 @@ ${sampleJson}`;
                           />
                           {u.expires_at && <button className="edit-remove-btn" style={{ width: 22, height: 22, fontSize: 10 }} onClick={() => handleUserAction(u.id, "set_expiry")} title="Remove expiry">✕</button>}
                         </span>
-                        <button className="edit-add-btn" style={{ borderColor: "rgba(255,45,85,0.25)", color: "var(--accent2)", background: "rgba(255,45,85,0.08)" }} onClick={() => {
+                        <button className="edit-add-btn" style={{ borderColor: "var(--coral)", color: "var(--coral)", background: "rgba(241,122,126,0.06)" }} onClick={() => {
                           if (confirm(`Permanently delete ${u.email}? This cannot be undone.`)) handleUserAction(u.id, "delete");
                         }}>🗑️ Delete</button>
                         <button className="edit-add-btn" onClick={() => {
@@ -1165,9 +1165,17 @@ export default function Home() {
       <header className="hero">
         <div className="particles" ref={particlesRef} aria-hidden="true" />
         <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout</a>
-        <h1><span className="gradient-text">Pattern SpeakOut</span></h1>
-        <p className="subtitle">เรียนรู้ภาษาอังกฤษจาก TikTok <strong>@patternspeakout</strong> — Idiom, วิธีพูด, และแรงบันดาลใจ พร้อม CEFR, ความหมายไทย–อังกฤษ และตัวอย่างประโยค</p>
+        <h1><span className="gradient-text">Practical English &amp; ideas, mapped to CEFR</span></h1>
+        <p className="subtitle">เรียนรู้ภาษาอังกฤษที่ใช้ได้จริงจาก TikTok และบทความ — พร้อมคำอธิบายไทย–อังกฤษและระดับ CEFR</p>
       </header>
+
+      {/* Sign in / Register — shown for guests only */}
+      {!userSession && (
+        <div className="header-auth-btns">
+          <button className="header-auth-btn secondary" onClick={() => { setAdminOpen(true); }}>Sign in</button>
+          <button className="header-auth-btn primary" onClick={() => { setAdminOpen(true); }}>Register</button>
+        </div>
+      )}
 
       {/* Hamburger */}
       <button className={`hamburger-btn ${adminOpen ? "active" : ""}`} onClick={() => setAdminOpen(v => !v)} aria-label={adminOpen ? "Close admin" : "Open admin"} aria-expanded={adminOpen}>
@@ -1238,17 +1246,24 @@ export default function Home() {
       <main className="main-content">
         {/* Category tabs */}
         <div className="category-tabs">
-          <button className={`category-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>📚 All</button>
-          <button className={`category-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>🎯 Idiom of the Day</button>
+          <button className={`category-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>Latest</button>
+          <button className={`category-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idioms</button>
           {adminToken && <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕</button>}
-          <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>🗣️ How to Say</button>
+          <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
           {adminToken && <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕</button>}
-          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>💪 Inspiring</button>
+          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiration</button>
           {adminToken && <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Inspiring">➕</button>}
+          <button className={`category-tab ${category === "articles" ? "active" : ""}`} onClick={() => setCategory("articles")}>Articles</button>
+        </div>
+
+        {/* Pronunciation hint */}
+        <div className="pronunciation-hint">
+          <span>Tap 🔊 to hear the pronunciation</span>
+          <span className="hint-thai">| กด 🔊 เพื่อฟังการออกเสียง</span>
         </div>
 
         <div className="section-header">
-          <h2 className="section-title"><span className="dot" aria-hidden="true" />{category === "all" ? "All Episodes" : category === "idiom" ? "Idiom of the Day" : category === "howtosay" ? "How to Say" : "Inspiring"}</h2>
+          <h2 className="section-title"><span className="dot" aria-hidden="true" />{category === "all" ? "Latest" : category === "idiom" ? "Idioms" : category === "howtosay" ? "How to Say" : category === "articles" ? "Articles" : "Inspiration"}</h2>
           <div className="result-count" aria-live="polite">{loading ? "กำลังโหลด…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}</div>
         </div>
         <div className="idiom-grid" role="list">
