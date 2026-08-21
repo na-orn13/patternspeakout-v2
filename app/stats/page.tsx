@@ -26,7 +26,7 @@ export default function StatsPage() {
     }
 
     // Fetch stats from the API
-    fetch("/api/stats", {
+    fetch("/api/analytics", {
       headers: { Authorization: `Bearer ${sessionStorage.getItem("admin_token") ?? ""}` },
     })
       .then((r) => r.json())

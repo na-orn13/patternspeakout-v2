@@ -908,7 +908,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           {userSession?.role === "admin" && tab === "admin" && (
             <>
               <div className="admin-card">
-                <div className="admin-section-label">📝 เพิ่ม {addCategory === "idiom" ? "Idiom" : addCategory === "howtosay" ? "How to Say" : "Motto"} (Paste JSON)</div>
+                <div className="admin-section-label">📝 เพิ่ม {addCategory === "idiom" ? "Idiom" : addCategory === "howtosay" ? "How to Say" : "Inspiring"} (Paste JSON)</div>
                 <p className="admin-hint">สร้าง JSON จาก ChatGPT แล้ว paste ลงด้านล่าง — category: <strong>{addCategory}</strong> (จะถูกเพิ่มอัตโนมัติ)</p>
                 <form onSubmit={handleUpload}>
                   <div className="admin-field">
@@ -927,7 +927,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                 <p className="admin-hint">ส่ง prompt นี้ให้ ChatGPT เพื่อสร้าง JSON ให้คุณ:</p>
                 <div style={{ position: "relative" }}>
                   <button className="copy-btn" onClick={() => {
-                    const categoryWord = addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "motto/quote" : "idiom";
+                    const categoryWord = addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "inspiring quote" : "idiom";
                     const prompt = `Create a JSON object for the English ${categoryWord} "[REPLACE THIS WITH THE ${categoryWord.toUpperCase()}]".
 
 RULES:
@@ -935,7 +935,7 @@ RULES:
 - Every synonym and antonym MUST have "meaningTH" (Thai meaning).
 - Every keyWord's synonyms and antonyms MUST also have "meaningTH".
 - Every example MUST have both "en" and "th".
-- Keep the "idiom" field name even if it's a phrase or motto.
+- Keep the "idiom" field name even if it's a phrase or inspiring quote.
 - Include 3-5 synonyms, 3-5 antonyms, 2-3 keyWords, and 3 examples.
 - Use today's date for "date" field.
 
@@ -944,7 +944,7 @@ ${sampleJson}`;
                     navigator.clipboard.writeText(prompt).then(() => onToast("Copied!", "success")).catch(() => onToast("Copy failed", "error"));
                   }} aria-label="Copy">📋 Copy</button>
                   <div style={{ background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: 8, padding: "36px 12px 12px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-teal)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
-                    {`📋 Click "Copy" above → Paste in ChatGPT → Replace "[REPLACE THIS...]" with your ${addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "motto" : "idiom"} → ChatGPT gives you paste-ready JSON → Paste it in the box above`}
+                    {`📋 Click "Copy" above → Paste in ChatGPT → Replace "[REPLACE THIS...]" with your ${addCategory === "howtosay" ? "phrase" : addCategory === "motto" ? "inspiring quote" : "idiom"} → ChatGPT gives you paste-ready JSON → Paste it in the box above`}
                   </div>
                 </div>
               </div>
@@ -1158,7 +1158,7 @@ export default function Home() {
 
       <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)}
         onAuth={(t, role) => {
-          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); }
+          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t); }
           else if (role === "user" && t) {
             setAdminToken("");
             // Fetch user info from token (user UUID)
@@ -1225,12 +1225,12 @@ export default function Home() {
           {adminToken && <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕</button>}
           <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>🗣️ How to Say</button>
           {adminToken && <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕</button>}
-          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>💪 Motto Motivation</button>
-          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Motto">➕</button>}
+          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>💪 Inspiring</button>
+          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Inspiring">➕</button>}
         </div>
 
         <div className="section-header">
-          <h2 className="section-title"><span className="dot" aria-hidden="true" />{category === "all" ? "All Episodes" : category === "idiom" ? "Idiom of the Day" : category === "howtosay" ? "How to Say" : "Motto Motivation"}</h2>
+          <h2 className="section-title"><span className="dot" aria-hidden="true" />{category === "all" ? "All Episodes" : category === "idiom" ? "Idiom of the Day" : category === "howtosay" ? "How to Say" : "Inspiring"}</h2>
           <div className="result-count" aria-live="polite">{loading ? "กำลังโหลด…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}</div>
         </div>
         <div className="idiom-grid" role="list">
@@ -1244,7 +1244,7 @@ export default function Home() {
           {!loading && !error && filtered.map((video, i) => {
             const d = getIdiomData(video);
             const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
-            const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Motto Motivation" : cat;
+            const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Inspiring" : cat;
             return (
             <VideoCard key={video.id} video={video} index={i}
               onClick={() => setSelectedVideo({ video, index: i })}
