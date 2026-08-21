@@ -214,7 +214,7 @@ function fmtNum(n: number) {
 }
 
 function fmtDate(iso: string) {
-  try { return new Date(iso).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); }
+  try { return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }); }
   catch { return iso; }
 }
 
@@ -1055,7 +1055,7 @@ ${sampleJson}`;
                         <div>
                           <div className="admin-ep-name">{u.full_name || u.display_name || u.email}</div>
                           <div className="admin-ep-meta">{u.email} · {u.phone ? `📱${u.phone}` : ""} · {u.age ? `${u.age}y` : ""} · <span style={{ color: u.status === "approved" ? "#27ae60" : u.status === "pending" ? "var(--orange)" : "var(--coral)" }}>{u.status}</span></div>
-                          {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("th-TH")}</div>}
+                          {u.expires_at && <div className="admin-ep-meta">Expires: {new Date(u.expires_at).toLocaleDateString("en-US")}</div>}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
@@ -1214,7 +1214,7 @@ export default function Home() {
             <button className={`top-nav-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>All</button>
             <button className={`top-nav-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idiom of the Day</button>
             <button className={`top-nav-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
-            <button className={`top-nav-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiring</button>
+            <button className={`top-nav-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiration</button>
           </div>
           <div className="top-nav-actions">
             {!userSession && (
