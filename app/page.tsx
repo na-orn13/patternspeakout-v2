@@ -483,7 +483,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
               {/* Definition */}
               <div className="modal-section">
                 <div className="section-label"><span className="icon">📖</span>ความหมาย · Definition</div>
-                <div className="def-box en"><div className="def-lang">🇬🇧 English</div><div className="def-text">{data.definitionEN}</div></div>
+                <div className="def-box en"><div className="def-lang">🇬🇧 English</div><div className="def-text">{data.definitionEN} <button className="speak-btn-sm" onClick={() => speakWord(data.definitionEN)} title="Listen">🔊</button></div></div>
                 <div className="def-box th"><div className="def-lang">🇹🇭 ภาษาไทย</div><div className="def-text">{data.definitionTH}</div></div>
               </div>
 
@@ -547,7 +547,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                             )}
                           </div>
                         </div>
-                        <div className="keyword-def-en">🇬🇧 {kw.definitionEN}</div>
+                        <div className="keyword-def-en">🇬🇧 {kw.definitionEN} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(kw.definitionEN); }} title="Listen">🔊</button></div>
                         <div className="keyword-def-th">🇹🇭 {kw.definitionTH}</div>
                         {kw.synonyms.length > 0 && (
                           <div className="keyword-syn-row">
