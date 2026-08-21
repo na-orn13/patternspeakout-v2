@@ -68,8 +68,13 @@ export default function DeckPage() {
   const [tab, setTab] = useState<"all" | "words" | "idioms">("all");
   const [cefrFilter, setCefrFilter] = useState("all");
   const [flashcardMode, setFlashcardMode] = useState(false);
-  const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
+  // Flashcard study mode
+  const [studyFilter, setStudyFilter] = useState<"all"|"memorised"|"not_memorised">("all");
+  const [cardStatuses, setCardStatuses] = useState<Record<string, string>>({});
+  const [shuffledDeck, setShuffledDeck] = useState<Array<{id:string;type:string;front:string;backEN:string;backTH:string;cefr:string;pos:string;example:string}>>([]);
+  const [studyIndex, setStudyIndex] = useState(0);
+  const [sessionComplete, setSessionComplete] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -119,6 +124,15 @@ export default function DeckPage() {
     if (stored) { setUserId(stored); fetchDeck(stored); }
     else setLoading(false);
   }, [fetchDeck]);
+
+  // Fetch flashcard statuses when user is loaded
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/flashcard-status?userId=${userId}`)
+      .then(r => r.json())
+      .then(d => { if (d.statuses) setCardStatuses(d.statuses); })
+      .catch(() => {});
+  }, [userId]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); setLoginLoading(true); setLoginError("");
@@ -177,8 +191,6 @@ export default function DeckPage() {
   const filteredWords = cefrFilter === "all" ? words : words.filter(w => (w.data.cefr ?? "B1") === cefrFilter);
   const filteredIdioms = cefrFilter === "all" ? idioms : idioms.filter(i => i.cefr === cefrFilter);
 
-  const currentCard = filteredCards[flashcardIndex];
-
   // ─── Not logged in ─────────────────────────────────────────────────────────
   if (!userId && !loading) {
     return (
@@ -208,54 +220,118 @@ export default function DeckPage() {
     );
   }
 
+  // ─── Helper: start flashcard session ────────────────────────────────────────
+  const startFlashcardSession = (filter: "all"|"memorised"|"not_memorised") => {
+    setStudyFilter(filter);
+    let eligible = [...filteredCards];
+    if (filter === "memorised") {
+      eligible = eligible.filter(c => cardStatuses[c.id] === "memorised");
+    } else if (filter === "not_memorised") {
+      eligible = eligible.filter(c => cardStatuses[c.id] !== "memorised");
+    }
+    // Shuffle (Fisher-Yates)
+    for (let i = eligible.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+    }
+    setShuffledDeck(eligible);
+    setStudyIndex(0);
+    setFlashcardFlipped(false);
+    setSessionComplete(false);
+    setFlashcardMode(true);
+  };
+
+  const handleStudyAction = async (status: "memorised"|"not_memorised") => {
+    const card = shuffledDeck[studyIndex];
+    if (!card || !userId) return;
+    // Persist status
+    setCardStatuses(prev => ({ ...prev, [card.id]: status }));
+    fetch("/api/flashcard-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, cardId: card.id, status }),
+    }).catch(() => {});
+    // Move to next card
+    setFlashcardFlipped(false);
+    if (studyIndex + 1 >= shuffledDeck.length) {
+      setSessionComplete(true);
+    } else {
+      setStudyIndex(i => i + 1);
+    }
+  };
+
   // ─── Flashcard Mode ────────────────────────────────────────────────────────
   if (flashcardMode) {
+    const studyCard = shuffledDeck[studyIndex];
     return (
       <div className="deck-page">
         <div className="deck-header">
           <button className="deck-back" onClick={() => setFlashcardMode(false)}>← Exit Flashcards</button>
           <h1 className="deck-title">🃏 Flashcard Mode</h1>
-          <div className="deck-counter">{flashcardIndex + 1} / {filteredCards.length}</div>
+          {!sessionComplete && shuffledDeck.length > 0 && (
+            <div className="deck-counter">{studyIndex + 1} of {shuffledDeck.length}</div>
+          )}
         </div>
 
-        {filteredCards.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>No cards in this filter. Try "All" CEFR levels.</div>
+        {/* Study filter tabs */}
+        <div className="deck-controls" style={{ paddingBottom: 12 }}>
+          <div className="deck-tabs">
+            <button className={`panel-tab ${studyFilter === "all" ? "active" : ""}`} onClick={() => startFlashcardSession("all")}>All ({filteredCards.length})</button>
+            <button className={`panel-tab ${studyFilter === "memorised" ? "active" : ""}`} onClick={() => startFlashcardSession("memorised")}>✅ Memorised ({filteredCards.filter(c => cardStatuses[c.id] === "memorised").length})</button>
+            <button className={`panel-tab ${studyFilter === "not_memorised" ? "active" : ""}`} onClick={() => startFlashcardSession("not_memorised")}>❌ Not memorised ({filteredCards.filter(c => cardStatuses[c.id] !== "memorised").length})</button>
+          </div>
+          <div className="deck-cefr-bar">
+            {["all", ...CEFR_LEVELS].map(level => (
+              <button key={level} className={`filter-btn ${cefrFilter === level ? "active" : ""}`} data-cefr={level !== "all" ? level : undefined}
+                onClick={() => { setCefrFilter(level); startFlashcardSession(studyFilter); }}>
+                {level === "all" ? "All" : level}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {sessionComplete ? (
+          <div className="flashcard-area" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Session Complete!</h2>
+            <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>You reviewed {shuffledDeck.length} card{shuffledDeck.length !== 1 ? "s" : ""}.</p>
+            <div className="flashcard-nav">
+              <button className="flashcard-nav-btn" onClick={() => startFlashcardSession(studyFilter)}>🔄 Restart</button>
+              <button className="flashcard-nav-btn" onClick={() => startFlashcardSession("not_memorised")}>❌ Not memorised only</button>
+              <button className="flashcard-nav-btn" onClick={() => setFlashcardMode(false)}>← Back to Deck</button>
+            </div>
+          </div>
+        ) : shuffledDeck.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+            <p>No cards in this category. Try a different filter.</p>
+          </div>
         ) : (
           <div className="flashcard-area">
-            <div className={`flashcard ${flashcardFlipped ? "flipped" : ""}`} onClick={() => { setFlashcardFlipped(f => { if (!f && currentCard) speakWord(currentCard.front); return !f; }); }}>
+            <div className={`flashcard ${flashcardFlipped ? "flipped" : ""}`} onClick={() => { setFlashcardFlipped(f => { if (!f && studyCard) speakWord(studyCard.front); return !f; }); }} style={{ "--fc-cefr-color": CEFR_COLORS[studyCard?.cefr ?? "B1"] } as React.CSSProperties}>
               <div className="flashcard-inner">
                 <div className="flashcard-front">
-                  <div className="flashcard-cefr" style={{ background: CEFR_COLORS[currentCard?.cefr ?? "B1"] }}>{currentCard?.cefr}</div>
-                  <div className="flashcard-word">{currentCard?.front}</div>
+                  <div className="flashcard-cefr" style={{ background: CEFR_COLORS[studyCard?.cefr ?? "B1"] }}>{studyCard?.cefr}</div>
+                  <div className="flashcard-word">{studyCard?.front}</div>
                   <div className="flashcard-hint">Tap to reveal</div>
                 </div>
                 <div className="flashcard-back">
-                  <div className="flashcard-cefr" style={{ background: CEFR_COLORS[currentCard?.cefr ?? "B1"] }}>{currentCard?.cefr}</div>
-                  <div className="flashcard-word" style={{ fontSize: 20 }}>{currentCard?.front}</div>
-                  {currentCard?.pos && <div className="flashcard-pos">{currentCard.pos}</div>}
-                  <div className="flashcard-def-en">🇬🇧 {currentCard?.backEN} {currentCard?.backEN && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(currentCard.backEN); }} title="Listen">🔊</button>}</div>
-                  <div className="flashcard-def-th">🇹🇭 {currentCard?.backTH} {currentCard?.backTH && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakThai(currentCard.backTH); }} title="ฟังภาษาไทย">🔊</button>}</div>
-                  {currentCard?.example && <div className="flashcard-example">💬 {currentCard.example}</div>}
+                  <div className="flashcard-cefr" style={{ background: CEFR_COLORS[studyCard?.cefr ?? "B1"] }}>{studyCard?.cefr}</div>
+                  <div className="flashcard-word" style={{ fontSize: 20 }}>{studyCard?.front}</div>
+                  {studyCard?.pos && <div className="flashcard-pos">{studyCard.pos}</div>}
+                  <div className="flashcard-def-en">🇬🇧 {studyCard?.backEN} {studyCard?.backEN && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(studyCard.backEN); }} title="Listen">🔊</button>}</div>
+                  <div className="flashcard-def-th">🇹🇭 {studyCard?.backTH} {studyCard?.backTH && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakThai(studyCard.backTH); }} title="ฟังภาษาไทย">🔊</button>}</div>
+                  {studyCard?.example && <div className="flashcard-example">💬 {studyCard.example}</div>}
                 </div>
               </div>
             </div>
 
             <div className="flashcard-nav">
-              <button className="flashcard-nav-btn" disabled={flashcardIndex === 0} onClick={() => { setFlashcardIndex(i => i - 1); setFlashcardFlipped(false); }}>← Prev</button>
-              <button className="flashcard-nav-btn" onClick={() => { setFlashcardFlipped(false); setFlashcardIndex(i => (i + 1) % filteredCards.length); }}>Next →</button>
+              <button className="flashcard-nav-btn" style={{ background: "#27ae60", color: "white", borderColor: "#27ae60" }} onClick={() => handleStudyAction("memorised")}>✅ Memorised</button>
+              <button className="flashcard-nav-btn" style={{ background: "var(--coral)", color: "white", borderColor: "var(--coral)" }} onClick={() => handleStudyAction("not_memorised")}>❌ Not memorised</button>
             </div>
           </div>
         )}
-
-        {/* CEFR filter for flashcards */}
-        <div className="deck-cefr-bar">
-          {["all", ...CEFR_LEVELS].map(level => (
-            <button key={level} className={`filter-btn ${cefrFilter === level ? "active" : ""}`} data-cefr={level !== "all" ? level : undefined}
-              onClick={() => { setCefrFilter(level); setFlashcardIndex(0); setFlashcardFlipped(false); }}>
-              {level === "all" ? "All" : level}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -289,7 +365,7 @@ export default function DeckPage() {
           ))}
         </div>
 
-        <button className="deck-flashcard-btn" onClick={() => { setFlashcardMode(true); setFlashcardIndex(0); setFlashcardFlipped(false); }} disabled={filteredCards.length === 0}>
+        <button className="deck-flashcard-btn" onClick={() => startFlashcardSession("all")} disabled={filteredCards.length === 0}>
           🃏 Flashcard Mode ({filteredCards.length} cards)
         </button>
       </div>

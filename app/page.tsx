@@ -247,10 +247,10 @@ function Toast({ msg, type }: { msg: string; type: "success" | "error" | "" }) {
 }
 
 // ─── Video Card ───────────────────────────────────────────────────────────────
-function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, onFav, epNumber, categoryLabel }: {
+function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, onFav, onGuestFav, epNumber, categoryLabel }: {
   video: Video; index: number; onClick: () => void;
   isAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
-  isFav?: boolean; onFav?: () => void;
+  isFav?: boolean; onFav?: () => void; onGuestFav?: () => void;
   epNumber: number; categoryLabel: string;
 }) {
   const color = colorFor(video, index);
@@ -272,8 +272,14 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
 
       {/* Favourite button (visible for all logged-in users) */}
       {onFav && (
-        <button className={`card-fav-btn ${isFav ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); onFav(); }} title={isFav ? "Remove from deck" : "Save to deck"} aria-label={isFav ? "Remove from deck" : "Save to deck"}>
+        <button className={`card-fav-btn ${isFav ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); onFav(); }} title={isFav ? "Remove from favorites" : "Add to favorites"} aria-label={isFav ? "Remove from favorites" : "Add to favorites"}>
           {isFav ? "❤️" : "🤍"}
+        </button>
+      )}
+      {/* Guest favourite — prompts sign-in */}
+      {!onFav && onGuestFav && (
+        <button className="card-fav-btn" onClick={(e) => { e.stopPropagation(); onGuestFav(); }} title="Sign in to add favorites" aria-label="Sign in to add favorites">
+          🤍
         </button>
       )}
 
@@ -713,7 +719,8 @@ interface SidePanelProps {
   open: boolean; onClose: () => void;
   onToast: (msg: string, type: "success"|"error") => void;
   onRefresh: () => void;
-  onAuth: (token: string, role: "admin"|"user"|"") => void;
+  onAuth: (token: string, role: "admin"|"user"|"", displayName?: string) => void;
+  onUpdateName?: (name: string) => void;
   userSession: { id: string; email: string; displayName: string; role: "admin"|"user" } | null;
   adminToken: string;
   videos: Video[];
@@ -725,8 +732,8 @@ interface SidePanelProps {
   initialTab?: "login"|"register";
 }
 
-function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory, initialTab }: SidePanelProps) {
-  const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users"|"stats">("login");
+function SidePanel({ open, onClose, onToast, onRefresh, onAuth, onUpdateName, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory, initialTab }: SidePanelProps) {
+  const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users"|"stats"|"settings">("login");
   // Sync tab from parent when header buttons trigger open
   useEffect(() => { if (initialTab && !userSession) setTab(initialTab); }, [initialTab, open, userSession]);
   // Login
@@ -749,6 +756,15 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
   // Admin: user management
   const [users, setUsers] = useState<Array<{id:string;email:string;display_name:string;full_name:string;age:number|null;phone:string;role:string;status:string;expires_at:string|null;created_at:string}>>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  // Settings
+  const [settingsName, setSettingsName] = useState("");
+  const [settingsCurPass, setSettingsCurPass] = useState("");
+  const [settingsNewPass, setSettingsNewPass] = useState("");
+  const [settingsConfirmPass, setSettingsConfirmPass] = useState("");
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsResult, setSettingsResult] = useState<string|null>(null);
+  // Pre-fill display name when user session is available or tab changes to settings
+  useEffect(() => { if (userSession && tab === "settings") setSettingsName(userSession.displayName || ""); }, [tab, userSession]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape" && open) onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [open, onClose]);
   useEffect(() => { if (open) document.body.style.overflow = "hidden"; else document.body.style.overflow = ""; return () => { document.body.style.overflow = ""; }; }, [open]);
 
@@ -775,7 +791,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
       const res = await fetch("/api/users/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: loginEmail, password: loginPass }) });
       const data = await res.json();
       if (!res.ok) { setLoginError(data.error); return; }
-      onAuth(data.token, "user");
+      onAuth(data.token, "user", data.user?.displayName);
       setLoginEmail(""); setLoginPass("");
       onClose();
     } catch { setLoginError("Network error."); }
@@ -916,6 +932,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
             {userSession.role === "admin" && <button className={`panel-tab ${tab === "admin" ? "active" : ""}`} onClick={() => setTab("admin")}>📝 Admin</button>}
             {userSession.role === "admin" && <button className={`panel-tab ${tab === "users" ? "active" : ""}`} onClick={() => { setTab("users"); fetchUsers(); }}>👥 Users</button>}
             <button className={`panel-tab ${tab === "deck" ? "active" : ""}`} onClick={() => setTab("deck")}>💾 My Deck</button>
+            <button className={`panel-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>⚙️ Settings</button>
             <button className="panel-tab" onClick={handleLogout}>🚪</button>
           </div>
         )}
@@ -993,6 +1010,70 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                   <p className="admin-hint">{savedWords.length} words saved — <a href="/deck" style={{ color: "var(--slate)" }}>open deck</a> to review</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ─── Settings tab ─── */}
+          {userSession && tab === "settings" && (
+            <div>
+              <div className="admin-section-label">⚙️ Account Settings</div>
+              <form className="admin-login-form" onSubmit={async (e) => {
+                e.preventDefault();
+                setSettingsLoading(true); setSettingsResult(null);
+                // Validate confirm password
+                if (settingsNewPass && settingsNewPass !== settingsConfirmPass) {
+                  setSettingsResult("❌ New passwords do not match.");
+                  setSettingsLoading(false); return;
+                }
+                if (settingsNewPass && settingsNewPass.length < 6) {
+                  setSettingsResult("❌ New password must be at least 6 characters.");
+                  setSettingsLoading(false); return;
+                }
+                try {
+                  const res = await fetch("/api/users/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      userId: userSession.id,
+                      displayName: settingsName.trim() || undefined,
+                      currentPassword: settingsCurPass || undefined,
+                      newPassword: settingsNewPass || undefined,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) { setSettingsResult(`❌ ${data.error}`); setSettingsLoading(false); return; }
+                  setSettingsResult("✅ Settings updated successfully!");
+                  setSettingsCurPass(""); setSettingsNewPass(""); setSettingsConfirmPass("");
+                  // Update displayed name across the app
+                  if (data.displayName && onUpdateName) {
+                    onUpdateName(data.displayName);
+                  }
+                  onToast("Settings saved", "success");
+                } catch { setSettingsResult("❌ Network error."); }
+                setSettingsLoading(false);
+              }}>
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="sp-settings-name">Display Name</label>
+                  <input id="sp-settings-name" className="admin-input" value={settingsName} onChange={e => setSettingsName(e.target.value)} placeholder="Your display name" />
+                </div>
+                <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
+                  <div className="admin-section-label" style={{ marginBottom: 12 }}>🔒 Change Password</div>
+                  <div className="admin-field">
+                    <label className="admin-label" htmlFor="sp-settings-curpass">Current Password</label>
+                    <input id="sp-settings-curpass" className="admin-input" type="password" value={settingsCurPass} onChange={e => setSettingsCurPass(e.target.value)} placeholder="Required to change password" autoComplete="current-password" />
+                  </div>
+                  <div className="admin-field">
+                    <label className="admin-label" htmlFor="sp-settings-newpass">New Password (min 6 chars)</label>
+                    <input id="sp-settings-newpass" className="admin-input" type="password" value={settingsNewPass} onChange={e => setSettingsNewPass(e.target.value)} placeholder="Leave blank to keep current" minLength={6} autoComplete="new-password" />
+                  </div>
+                  <div className="admin-field">
+                    <label className="admin-label" htmlFor="sp-settings-confirm">Confirm New Password</label>
+                    <input id="sp-settings-confirm" className="admin-input" type="password" value={settingsConfirmPass} onChange={e => setSettingsConfirmPass(e.target.value)} placeholder="Re-enter new password" autoComplete="new-password" />
+                  </div>
+                </div>
+                {settingsResult && <div className={`admin-result ${settingsResult.startsWith("✅") ? "ok" : "err"}`}>{settingsResult}</div>}
+                <button className="admin-login-btn" type="submit" disabled={settingsLoading}>{settingsLoading ? <><span className="spin">↻</span> Saving…</> : <>💾 Save Settings</>}</button>
+              </form>
             </div>
           )}
 
@@ -1243,13 +1324,14 @@ export default function Home() {
       </section>
 
       <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} initialTab={panelInitialTab}
-        onAuth={(t, role) => {
+        onUpdateName={(name) => setUserSession(prev => prev ? { ...prev, displayName: name } : prev)}
+        onAuth={(t, role, displayName) => {
           if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t); }
           else if (role === "user" && t) {
             setAdminToken("");
             // Fetch user info from token (user UUID)
             fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); if (d.words) setSavedWords(d.words); });
-            setUserSession({ id: t, email: "", displayName: "User", role: "user" });
+            setUserSession({ id: t, email: "", displayName: displayName || "User", role: "user" });
             sessionStorage.setItem("deck_userId", t);
           } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]); sessionStorage.removeItem("deck_userId"); }
         }}
@@ -1278,7 +1360,7 @@ export default function Home() {
         <div className="controls-inner">
           <div className="search-wrap">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search idioms, articles..." aria-label="Search" autoComplete="off" id="searchInput" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" aria-label="Search" autoComplete="off" id="searchInput" />
           </div>
           <div className="filter-group" role="group" aria-label="CEFR filter">
             {["all", "A1", "A2", "B1", "B2", "C1", "C2"].map(level => (
@@ -1298,12 +1380,21 @@ export default function Home() {
 
       {/* Main */}
       <main className="main-content">
-        {/* Admin add buttons next to categories */}
+        {/* Admin toolbar */}
         {adminToken && (
-          <div className="category-tabs" style={{ marginBottom: 16 }}>
-            <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕ Idiom</button>
-            <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕ How to Say</button>
-            <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Inspiring">➕ Inspiring</button>
+          <div className="admin-toolbar">
+            <div className="admin-toolbar-left">
+              <h2 className="admin-toolbar-title">Content Management</h2>
+              <span className="admin-toolbar-count">{videos.length} episodes</span>
+            </div>
+            <div className="admin-toolbar-right">
+              <select className="admin-toolbar-select" value={addCategory} onChange={(e) => setAddCategory(e.target.value as "idiom"|"howtosay"|"motto")}>
+                <option value="idiom">Idiom</option>
+                <option value="howtosay">How to Say</option>
+                <option value="motto">Inspiring</option>
+              </select>
+              <button className="admin-toolbar-btn" onClick={() => { setAdminOpen(true); }}>➕ Add content</button>
+            </div>
           </div>
         )}
 
@@ -1357,6 +1448,7 @@ export default function Home() {
                   setFavourites(prev => { const next = new Set(prev); if (isFav) next.delete(video.tiktok_id); else next.add(video.tiktok_id); return next; });
                 } catch { /* ignore */ }
               } : undefined}
+              onGuestFav={!userSession ? () => { setPanelInitialTab("login"); setAdminOpen(true); showToast("Please sign in to save favorites", "error"); } : undefined}
             />
             );
           })}
