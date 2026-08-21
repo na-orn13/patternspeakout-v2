@@ -662,10 +662,13 @@ interface SidePanelProps {
   onToggleFav: (tiktokId: string) => void;
   onRemoveWord: (wordId: string) => void;
   addCategory: string;
+  initialTab?: "login"|"register";
 }
 
-function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory }: SidePanelProps) {
+function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory, initialTab }: SidePanelProps) {
   const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users"|"stats">("login");
+  // Sync tab from parent when header buttons trigger open
+  useEffect(() => { if (initialTab && !userSession) setTab(initialTab); }, [initialTab, open, userSession]);
   // Login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -861,11 +864,6 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
           {/* ─── Not logged in: Login / Register ─── */}
           {!userSession && (
             <>
-              <div className="panel-tabs" style={{ marginBottom: 16 }}>
-                <button className={`panel-tab ${tab === "login" ? "active" : ""}`} onClick={() => setTab("login")}>Sign in</button>
-                <button className={`panel-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>Register</button>
-              </div>
-
               {tab === "login" && (
                 <form className="admin-login-form" onSubmit={handleLogin}>
                   <div className="admin-field"><label className="admin-label" htmlFor="sp-email">Email</label><input id="sp-email" className="admin-input" type="text" autoComplete="username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required autoFocus /></div>
@@ -1051,6 +1049,7 @@ export default function Home() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
   const [epMap, setEpMap] = useState<Map<string, number>>(new Map());
   const [adminOpen, setAdminOpen] = useState(false);
+  const [panelInitialTab, setPanelInitialTab] = useState<"login"|"register">("login");
   const [adminToken, setAdminToken] = useState("");
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [userSession, setUserSession] = useState<{ id: string; email: string; displayName: string; role: "admin"|"user" } | null>(null);
@@ -1177,28 +1176,36 @@ export default function Home() {
 
   return (
     <>
-      {/* HERO */}
-      <header className="hero">
-        <div className="particles" ref={particlesRef} aria-hidden="true" />
-        <a href="https://www.tiktok.com/@patternspeakout" target="_blank" rel="noopener noreferrer" className="channel-badge" style={{ textDecoration: "none" }}><span className="tiktok-logo">tt</span>@patternspeakout</a>
-        <h1><span className="gradient-text">Practical English &amp; ideas, mapped to CEFR</span></h1>
-        <p className="subtitle">เรียนรู้ภาษาอังกฤษที่ใช้ได้จริงจาก TikTok และบทความ — พร้อมคำอธิบายไทย–อังกฤษและระดับ CEFR</p>
-      </header>
-
-      {/* Sign in / Register — shown for guests only */}
-      {!userSession && (
-        <div className="header-auth-btns">
-          <button className="header-auth-btn secondary" onClick={() => { setAdminOpen(true); }}>Sign in</button>
-          <button className="header-auth-btn primary" onClick={() => { setAdminOpen(true); }}>Register</button>
+      {/* TOP NAVIGATION BAR */}
+      <nav className="top-nav" aria-label="Main navigation">
+        <div className="top-nav-inner">
+          <a href="/" className="top-nav-logo">Pattern<span>SpeakOut</span></a>
+          <div className="top-nav-tabs">
+            <button className={`top-nav-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>All</button>
+            <button className={`top-nav-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idiom of the Day</button>
+            <button className={`top-nav-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
+            <button className={`top-nav-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiring</button>
+          </div>
+          <div className="top-nav-actions">
+            {!userSession && (
+              <>
+                <button className="header-auth-btn secondary" onClick={() => { setPanelInitialTab("login"); setAdminOpen(true); }}>Sign in</button>
+                <button className="header-auth-btn primary" onClick={() => { setPanelInitialTab("register"); setAdminOpen(true); }}>Register</button>
+              </>
+            )}
+            {userSession && <a href="/deck" className="deck-page-btn" style={{ marginRight: 4 }}>🃏 My Deck</a>}
+            {adminToken && <a href="/stats" className="deck-page-btn" style={{ background: "rgba(155,89,182,0.08)", borderColor: "rgba(155,89,182,0.25)", color: "#a855f7", marginRight: 4 }}>📊 Stats</a>}
+            <button className={`hamburger-btn ${adminOpen ? "active" : ""}`} onClick={() => setAdminOpen(v => !v)} aria-label={adminOpen ? "Close panel" : "Open panel"} aria-expanded={adminOpen}>
+              <span className="hamburger-line" /><span className="hamburger-line" /><span className="hamburger-line" />
+            </button>
+          </div>
         </div>
-      )}
+      </nav>
 
-      {/* Hamburger */}
-      <button className={`hamburger-btn ${adminOpen ? "active" : ""}`} onClick={() => setAdminOpen(v => !v)} aria-label={adminOpen ? "Close admin" : "Open admin"} aria-expanded={adminOpen}>
-        <span className="hamburger-line" /><span className="hamburger-line" /><span className="hamburger-line" />
-      </button>
+      {/* Hidden hero for particles (preserves JS) */}
+      <div style={{ display: "none" }}><div ref={particlesRef} /></div>
 
-      <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)}
+      <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} initialTab={panelInitialTab}
         onAuth={(t, role) => {
           if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t); }
           else if (role === "user" && t) {
@@ -1229,12 +1236,6 @@ export default function Home() {
         addCategory={addCategory}
       />
 
-      {/* Stats + Deck bar */}
-      <div className="status-bar"><div className="status-bar-inner">
-        {userSession && <a href="/deck" className="deck-page-btn">🃏 My Deck</a>}
-        {adminToken && <a href="/stats" className="deck-page-btn" style={{ background: "rgba(155,89,182,0.08)", borderColor: "rgba(155,89,182,0.25)", color: "#a855f7" }}>📊 Stats</a>}
-      </div></div>
-
       {/* Controls */}
       <nav className="controls-bar" aria-label="Filter and search">
         <div className="controls-inner">
@@ -1260,17 +1261,14 @@ export default function Home() {
 
       {/* Main */}
       <main className="main-content">
-        {/* Category tabs */}
-        <div className="category-tabs">
-          <button className={`category-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>Latest</button>
-          <button className={`category-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idioms</button>
-          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕</button>}
-          <button className={`category-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
-          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕</button>}
-          <button className={`category-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiration</button>
-          {adminToken && <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Inspiring">➕</button>}
-          <button className={`category-tab ${category === "articles" ? "active" : ""}`} onClick={() => setCategory("articles")}>Articles</button>
-        </div>
+        {/* Admin add buttons next to categories */}
+        {adminToken && (
+          <div className="category-tabs" style={{ marginBottom: 16 }}>
+            <button className="category-add-btn" onClick={() => { setCategory("idiom"); setAdminOpen(true); setAddCategory("idiom"); }} title="Add Idiom">➕ Idiom</button>
+            <button className="category-add-btn" onClick={() => { setCategory("howtosay"); setAdminOpen(true); setAddCategory("howtosay"); }} title="Add How to Say">➕ How to Say</button>
+            <button className="category-add-btn" onClick={() => { setCategory("motto"); setAdminOpen(true); setAddCategory("motto"); }} title="Add Inspiring">➕ Inspiring</button>
+          </div>
+        )}
 
         {/* Pronunciation hint */}
         <div className="pronunciation-hint">
