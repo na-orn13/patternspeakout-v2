@@ -689,7 +689,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
         const data = await adminRes.json();
         onAuth(data.token, "admin");
         setLoginEmail(""); setLoginPass("");
-        setTab("admin");
+        onClose();
         return;
       }
       // Try user login
@@ -698,7 +698,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
       if (!res.ok) { setLoginError(data.error); return; }
       onAuth(data.token, "user");
       setLoginEmail(""); setLoginPass("");
-      setTab("deck");
+      onClose();
     } catch { setLoginError("Network error."); }
     finally { setLoginLoading(false); }
   };
@@ -709,7 +709,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
       const res = await fetch("/api/users/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: regEmail, password: regPass, displayName: regName, fullName: regName, age: parseInt(regAge) || 0, phone: regPhone }) });
       const data = await res.json();
       if (!res.ok) { setRegResult(`❌ ${data.error}`); return; }
-      setRegResult(`✅ ${data.message}`);
+      setRegResult(`✅ Registration successful!\nPlease wait for admin to grant access, then sign in again.\n\nลงทะเบียนสำเร็จ!\nกรุณารอให้ admin อนุมัติสิทธิ์การเข้าใช้งาน แล้วลงชื่อเข้าใช้อีกครั้ง`);
       setRegEmail(""); setRegPass(""); setRegName(""); setRegAge(""); setRegPhone("");
     } catch { setRegResult("❌ Network error."); }
     finally { setRegLoading(false); }
@@ -866,9 +866,9 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
                   <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-phone">Phone Number *</label><input id="sp-reg-phone" className="admin-input" type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="0812345678" required /></div>
                   <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-email">Email *</label><input id="sp-reg-email" className="admin-input" type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} required placeholder="you@email.com" /></div>
                   <div className="admin-field"><label className="admin-label" htmlFor="sp-reg-pass">Password (min 6 chars) *</label><input id="sp-reg-pass" className="admin-input" type="password" value={regPass} onChange={e => setRegPass(e.target.value)} required minLength={6} /></div>
-                  {regResult && <div className={`admin-result ${regResult.startsWith("✅") ? "ok" : "err"}`}>{regResult}</div>}
+                  {regResult && <div className={`admin-result ${regResult.startsWith("✅") ? "ok" : "err"}`} style={{ whiteSpace: "pre-line" }}>{regResult}</div>}
                   <button className="admin-login-btn" type="submit" disabled={regLoading}>{regLoading ? <><span className="spin">↻</span> Registering…</> : <>📝 Register</>}</button>
-                  <p className="admin-hint" style={{ marginTop: 8 }}>After registering, admin must approve your account before you can sign in.</p>
+                  <p className="admin-hint" style={{ marginTop: 8, whiteSpace: "pre-line" }}>After registering, please wait for admin to approve your account, then sign in again.{"\n"}หลังจากลงทะเบียน กรุณารอให้ admin อนุมัติ แล้วลงชื่อเข้าใช้อีกครั้ง</p>
                 </form>
               )}
             </>
