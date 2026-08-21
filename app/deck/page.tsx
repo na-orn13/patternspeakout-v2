@@ -4,6 +4,22 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+// Text-to-speech helper
+function speakWord(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 0.85;
+  utterance.pitch = 1;
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => v.lang.startsWith("en") && v.name.includes("Google")) ??
+    voices.find(v => v.lang.startsWith("en-US")) ??
+    voices.find(v => v.lang.startsWith("en"));
+  if (preferred) utterance.voice = preferred;
+  window.speechSynthesis.speak(utterance);
+}
+
 interface WordItem {
   id: string;
   data: {
@@ -193,7 +209,7 @@ export default function DeckPage() {
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>No cards in this filter. Try "All" CEFR levels.</div>
         ) : (
           <div className="flashcard-area">
-            <div className={`flashcard ${flashcardFlipped ? "flipped" : ""}`} onClick={() => setFlashcardFlipped(f => !f)}>
+            <div className={`flashcard ${flashcardFlipped ? "flipped" : ""}`} onClick={() => { setFlashcardFlipped(f => { if (!f && currentCard) speakWord(currentCard.front); return !f; }); }}>
               <div className="flashcard-inner">
                 <div className="flashcard-front">
                   <div className="flashcard-cefr" style={{ background: CEFR_COLORS[currentCard?.cefr ?? "B1"] }}>{currentCard?.cefr}</div>
@@ -273,7 +289,7 @@ export default function DeckPage() {
             {filteredWords.map(w => (
               <div key={w.id} className="deck-word-card">
                 <div className="deck-word-top">
-                  <span className="deck-word-name">{w.data.word}</span>
+                  <span className="deck-word-name">{w.data.word} <button className="speak-btn" onClick={() => speakWord(w.data.word ?? "")} title="Listen">🔊</button></span>
                   <span className={`tag tag-cefr ${w.data.cefr}`} style={{ fontSize: 10 }}>{w.data.cefr}</span>
                   {w.data.pos && <span className="tag tag-pos" style={{ fontSize: 10 }}>{w.data.pos}</span>}
                   <button className="deck-remove-btn" onClick={() => handleRemoveWord(w.id)}>✕</button>

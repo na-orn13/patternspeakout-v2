@@ -58,6 +58,23 @@ function getWordTH(item: string | RichWord): string {
   return typeof item === "string" ? "" : (item.meaningTH || "");
 }
 
+// Text-to-speech helper (uses browser built-in Web Speech API — free, no API key)
+function speakWord(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 0.85;
+  utterance.pitch = 1;
+  // Try to use a natural-sounding voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => v.lang.startsWith("en") && v.name.includes("Google")) ??
+    voices.find(v => v.lang.startsWith("en-US")) ??
+    voices.find(v => v.lang.startsWith("en"));
+  if (preferred) utterance.voice = preferred;
+  window.speechSynthesis.speak(utterance);
+}
+
 interface Video {
   id: string;
   tiktok_id: string;
@@ -480,7 +497,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const sSaved = savedWordIds?.has(sId);
                     return <span key={i} className={`chip chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
                       onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Means the same as "${data.idiom}" — ${data.definitionEN}`, definitionTH: rw.meaningTH || data.definitionTH, example: rw.example })}
-                    ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
                 <div>
@@ -491,7 +508,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const aSaved = savedWordIds?.has(aId);
                     return <span key={i} className={`chip chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
                       onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Opposite of "${data.idiom}" — means NOT ${data.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${data.idiom}" — ${data.definitionTH}`, example: rw.example })}
-                    ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                   })}</div>
                 </div>
               </div>
@@ -516,7 +533,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                       return (
                       <div key={i} className="keyword-card">
                         <div className="keyword-header">
-                          <div className="keyword-word">{kw.word}</div>
+                          <div className="keyword-word">{kw.word} <button className="speak-btn" onClick={(e) => { e.stopPropagation(); speakWord(kw.word); }} title="Listen">🔊</button></div>
                           <div className="keyword-badges">
                             <span className={`tag tag-cefr ${kw.cefr}`}>{kw.cefr}</span>
                             <span className="tag tag-pos">{kw.pos}</span>
@@ -540,7 +557,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const sSaved = savedWordIds?.has(sId);
                               return <span key={j} className={`mini-chip mini-chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
                                 onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Means the same as "${kw.word}" — ${kw.definitionEN}`, definitionTH: rw.meaningTH || kw.definitionTH, example: rw.example })}
-                              ><span className="chip-word">{rw.word}{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
                         )}
@@ -553,7 +570,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const aSaved = savedWordIds?.has(aId);
                               return <span key={j} className={`mini-chip mini-chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
                                 onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Opposite of "${kw.word}" — means NOT ${kw.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${kw.word}" — ${kw.definitionTH}`, example: rw.example })}
-                              ><span className="chip-word">{rw.word}{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
                             })}</div>
                           </div>
                         )}

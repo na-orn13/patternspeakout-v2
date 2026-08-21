@@ -2512,3 +2512,52 @@ select.edit-input { cursor: pointer; }
   letter-spacing: 0.8px;
   margin-top: 4px;
 }
+
+/* ===== SPEAK BUTTONS (pronunciation) ===== */
+.speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: var(--transition);
+  padding: 0;
+  margin-left: 4px;
+  vertical-align: middle;
+  border-radius: 50%;
+}
+
+.speak-btn:hover {
+  opacity: 1;
+  background: rgba(0,245,212,0.1);
+  transform: scale(1.15);
+}
+
+.speak-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.5;
+  transition: var(--transition);
+  padding: 0;
+  margin-left: 3px;
+  vertical-align: middle;
+  border-radius: 50%;
+}
+
+.speak-btn-sm:hover {
+  opacity: 1;
+  background: rgba(0,245,212,0.15);
+  transform: scale(1.2);
+}
