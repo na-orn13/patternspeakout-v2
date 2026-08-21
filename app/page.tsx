@@ -846,7 +846,7 @@ function SidePanel({ open, onClose, onToast, onRefresh, onAuth, userSession, adm
       <div className={`admin-backdrop ${open ? "open" : ""}`} onClick={onClose} aria-hidden="true" />
       <aside className={`admin-panel ${open ? "open" : ""}`} aria-label="Side panel">
         <div className="admin-panel-header">
-          <div className="admin-panel-title"><span>⚙️</span><span>{userSession ? userSession.displayName : "Sign in"}</span></div>
+          <div className="admin-panel-title"><span>⚙️</span><span>{userSession ? userSession.displayName : tab === "register" ? "Register" : "Sign in"}</span></div>
           <button className="admin-panel-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
@@ -1205,6 +1205,13 @@ export default function Home() {
       {/* Hidden hero for particles (preserves JS) */}
       <div style={{ display: "none" }}><div ref={particlesRef} /></div>
 
+      {/* HERO SECTION */}
+      <section className="hero">
+        <span className="channel-badge">LEARN ENGLISH FROM TIKTOK @PATTERNSPEAKOUT</span>
+        <h1><span className="gradient-text">Practical English &amp; ideas, mapped to CEFR</span></h1>
+        <p className="subtitle">เรียนรู้ภาษาอังกฤษที่ใช้ได้จริงจาก TikTok และบทความ — พร้อมคำอธิบายไทย–อังกฤษและระดับ CEFR</p>
+      </section>
+
       <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} initialTab={panelInitialTab}
         onAuth={(t, role) => {
           if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t); }
@@ -1241,12 +1248,12 @@ export default function Home() {
         <div className="controls-inner">
           <div className="search-wrap">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหา Idiom, ความหมาย, CEFR…" aria-label="ค้นหา" autoComplete="off" id="searchInput" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search idioms, articles..." aria-label="Search" autoComplete="off" id="searchInput" />
           </div>
           <div className="filter-group" role="group" aria-label="CEFR filter">
             {["all", "A1", "A2", "B1", "B2", "C1", "C2"].map(level => (
               <button key={level} className={`filter-btn ${cefrFilter === level ? "active" : ""}`} data-cefr={level !== "all" ? level : undefined} onClick={() => setCefrFilter(level)}>
-                {level === "all" ? "ทั้งหมด" : level}
+                {level === "all" ? "All levels" : level}
               </button>
             ))}
           </div>
