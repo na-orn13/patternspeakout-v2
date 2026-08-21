@@ -206,7 +206,7 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
           <div className="card-meta">
             <div className="card-episode">{categoryLabel}</div>
             <div className="card-episode">EP.{String(epNumber).padStart(3, "0")}</div>
-            <div className="card-idiom-title">{data?.idiom ?? video.title}</div>
+            <div className="card-idiom-title">{data?.idiom ?? video.title} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(data?.idiom ?? video.title); }} title="Listen">🔊</button></div>
             <div className="card-tags">
               {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
               {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
@@ -467,6 +467,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
               <div className="modal-idiom-name" style={{ background: `linear-gradient(135deg, #f5f5f5, ${color})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 {data?.idiom ?? video.title}
               </div>
+              <button className="speak-btn" onClick={(e) => { e.stopPropagation(); speakWord(data?.idiom ?? video.title); }} title="Listen" style={{ marginTop: 4 }}>🔊</button>
               <div className="modal-tags">
                 {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
                 {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
@@ -593,7 +594,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                       return (
                         <div key={i} className="example-item">
                           <div className="example-num">{i + 1}</div>
-                          <div className="example-en" dangerouslySetInnerHTML={{ __html: `"${highlighted}"` }} />
+                          <div className="example-en"><span dangerouslySetInnerHTML={{ __html: `"${highlighted}"` }} /> <button className="speak-btn-sm" onClick={() => speakWord(ex.en)} title="Listen">🔊</button></div>
                           <div className="example-th">{ex.th}</div>
                         </div>
                       );
