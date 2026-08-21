@@ -59,6 +59,23 @@ function getWordTH(item: string | RichWord): string {
 }
 
 // Text-to-speech helper (uses browser built-in Web Speech API — free, no API key)
+function getVoice(lang: "en" | "th"): SpeechSynthesisVoice | undefined {
+  const voices = window.speechSynthesis.getVoices();
+  if (lang === "th") {
+    return voices.find(v => v.lang.startsWith("th") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("th") && v.localService === false) ??
+      voices.find(v => v.lang.startsWith("th"));
+  }
+  return voices.find(v => v.lang.startsWith("en") && /Natural|Premium|Enhanced/i.test(v.name)) ??
+    voices.find(v => v.lang.startsWith("en") && v.name.includes("Samantha")) ??
+    voices.find(v => v.lang.startsWith("en") && v.name.includes("Daniel")) ??
+    voices.find(v => v.lang.startsWith("en-US") && v.name.includes("Google")) ??
+    voices.find(v => v.lang.startsWith("en-GB") && v.name.includes("Google")) ??
+    voices.find(v => v.lang.startsWith("en") && v.localService === false) ??
+    voices.find(v => v.lang.startsWith("en-US")) ??
+    voices.find(v => v.lang.startsWith("en"));
+}
+
 function speakWord(text: string, lang: "en" | "th" = "en") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -66,30 +83,75 @@ function speakWord(text: string, lang: "en" | "th" = "en") {
   utterance.lang = lang === "th" ? "th-TH" : "en-US";
   utterance.rate = lang === "th" ? 0.9 : 0.82;
   utterance.pitch = lang === "th" ? 1.0 : 1.05;
-  // Try to use the most natural-sounding voice available
-  const voices = window.speechSynthesis.getVoices();
-  let preferred: SpeechSynthesisVoice | undefined;
-  if (lang === "th") {
-    preferred = voices.find(v => v.lang.startsWith("th") && v.name.includes("Google")) ??
-      voices.find(v => v.lang.startsWith("th") && v.localService === false) ??
-      voices.find(v => v.lang.startsWith("th"));
-  } else {
-    // Prefer premium/natural voices (Samantha, Google UK English, Daniel, etc.)
-    preferred = voices.find(v => v.lang.startsWith("en") && /Natural|Premium|Enhanced/i.test(v.name)) ??
-      voices.find(v => v.lang.startsWith("en") && v.name.includes("Samantha")) ??
-      voices.find(v => v.lang.startsWith("en") && v.name.includes("Daniel")) ??
-      voices.find(v => v.lang.startsWith("en-US") && v.name.includes("Google")) ??
-      voices.find(v => v.lang.startsWith("en-GB") && v.name.includes("Google")) ??
-      voices.find(v => v.lang.startsWith("en") && v.localService === false) ??
-      voices.find(v => v.lang.startsWith("en-US")) ??
-      voices.find(v => v.lang.startsWith("en"));
-  }
+  const preferred = getVoice(lang);
   if (preferred) utterance.voice = preferred;
   window.speechSynthesis.speak(utterance);
 }
 
-// Short alias for Thai speech
 function speakThai(text: string) { speakWord(text, "th"); }
+
+// Bilingual segmentation: detects Thai (\u0E00-\u0E7F) vs English segments
+// Plays them consecutively with the correct voice for each segment
+function segmentBilingual(text: string): Array<{ text: string; lang: "en" | "th" }> {
+  const thaiRange = /[\u0E00-\u0E7F]/;
+  const segments: Array<{ text: string; lang: "en" | "th" }> = [];
+  let current = "";
+  let currentLang: "en" | "th" = "en";
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const isThai = thaiRange.test(ch);
+    const charLang: "en" | "th" = isThai ? "th" : "en";
+
+    if (current.length === 0) {
+      currentLang = charLang;
+      current = ch;
+    } else if (charLang === currentLang || /[\s''""'"`.,!?;:\-–—()[\]{}\/]/.test(ch)) {
+      // Same language or punctuation/whitespace: keep accumulating
+      current += ch;
+    } else {
+      // Language switch
+      const trimmed = current.trim();
+      if (trimmed) segments.push({ text: trimmed, lang: currentLang });
+      current = ch;
+      currentLang = charLang;
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed) segments.push({ text: trimmed, lang: currentLang });
+  return segments;
+}
+
+function speakBilingual(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+
+  const segments = segmentBilingual(text);
+  if (segments.length === 0) return;
+
+  // If all segments are one language, just speak directly
+  if (segments.length === 1) {
+    speakWord(segments[0].text, segments[0].lang);
+    return;
+  }
+
+  // Queue segments: each speaks after the previous finishes
+  let i = 0;
+  function speakNext() {
+    if (i >= segments.length) return;
+    const seg = segments[i];
+    i++;
+    const utterance = new SpeechSynthesisUtterance(seg.text);
+    utterance.lang = seg.lang === "th" ? "th-TH" : "en-US";
+    utterance.rate = seg.lang === "th" ? 0.9 : 0.82;
+    utterance.pitch = seg.lang === "th" ? 1.0 : 1.05;
+    const preferred = getVoice(seg.lang);
+    if (preferred) utterance.voice = preferred;
+    utterance.onend = speakNext;
+    window.speechSynthesis.speak(utterance);
+  }
+  speakNext();
+}
 
 interface Video {
   id: string;
@@ -222,7 +284,7 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
           <div className="card-meta">
             <div className="card-episode">{categoryLabel}</div>
             <div className="card-episode">EP.{String(epNumber).padStart(3, "0")}</div>
-            <div className="card-idiom-title">{data?.idiom ?? video.title} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(data?.idiom ?? video.title); }} title="Listen">🔊</button></div>
+            <div className="card-idiom-title">{data?.idiom ?? video.title} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakBilingual(data?.idiom ?? video.title); }} title="Listen">🔊</button></div>
             <div className="card-tags">
               {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
               {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
@@ -456,7 +518,7 @@ function EditModal({ video, token, onClose, onSaved, onToast }: {
 }
 
 // ─── Rich Detail Modal ────────────────────────────────────────────────────────
-function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveWord }: { video: Video; index: number; onClose: () => void; userSession?: { id: string } | null; savedWordIds?: Set<string>; onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void }) {
+function DetailModal({ video, index, epNumber, onClose, userSession, savedWordIds, onSaveWord }: { video: Video; index: number; epNumber: number; onClose: () => void; userSession?: { id: string } | null; savedWordIds?: Set<string>; onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void }) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
@@ -470,20 +532,18 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
         <button className="modal-close" onClick={onClose} aria-label="ปิด">✕</button>
 
         {/* Hero */}
-        <div className="modal-hero" style={{ background: `linear-gradient(135deg, ${color}14 0%, transparent 60%)`, borderBottom: `1px solid ${color}30` }}>
-          <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: color, opacity: 0.06, pointerEvents: "none" }} />
+        <div className="modal-hero">
           <div className="modal-episode-row">
-            <span className="modal-episode">{data?.episode ?? `EP.${String(index + 1).padStart(3, "0")}`}</span>
+            <span className="modal-episode">EP.{String(epNumber).padStart(3, "0")}</span>
             <span style={{ color: "var(--border)" }}>·</span>
             <span className="modal-date">{fmtDate(video.published_at)}</span>
           </div>
           <div className="modal-emoji-title">
             <div className="modal-emoji" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>{emoji}</div>
             <div className="modal-title-wrap">
-              <div className="modal-idiom-name" style={{ background: `linear-gradient(135deg, #f5f5f5, ${color})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                {data?.idiom ?? video.title}
+              <div className="modal-idiom-name">
+                {data?.idiom ?? video.title} <button className="speak-btn" onClick={(e) => { e.stopPropagation(); speakBilingual(data?.idiom ?? video.title); }} title="Listen">🔊</button>
               </div>
-              <button className="speak-btn" onClick={(e) => { e.stopPropagation(); speakWord(data?.idiom ?? video.title); }} title="Listen" style={{ marginTop: 4 }}>🔊</button>
               <div className="modal-tags">
                 {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
                 {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
@@ -1120,22 +1180,7 @@ export default function Home() {
     setFiltered(result);
   }, [videos, search, sort, cefrFilter, category]);
 
-  // Compute episode numbers: oldest = EP.001 within each category
-  useEffect(() => {
-    const map = new Map<string, number>();
-    const categories = ["idiom", "howtosay", "motto"];
-    for (const cat of categories) {
-      const catVideos = videos.filter(v => {
-        const d = getIdiomData(v);
-        return (d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom") === cat;
-      });
-      catVideos.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
-      catVideos.forEach((v, i) => map.set(v.tiktok_id, i + 1));
-    }
-    setEpMap(map);
-  }, [videos]);
-
-  // Compute episode numbers: oldest = EP.001 within each category
+  // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
   useEffect(() => {
     const map = new Map<string, number>();
     const grouped: Record<string, Video[]> = {};
@@ -1148,21 +1193,6 @@ export default function Home() {
     for (const cat of Object.keys(grouped)) {
       grouped[cat].sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
       grouped[cat].forEach((v, i) => map.set(v.tiktok_id, i + 1));
-    }
-    setEpMap(map);
-  }, [videos]);
-
-  // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
-  useEffect(() => {
-    const map = new Map<string, number>();
-    const categories = ["idiom", "howtosay", "motto"];
-    for (const cat of categories) {
-      const catVideos = videos.filter(v => {
-        const d = getIdiomData(v);
-        return (d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom") === cat;
-      });
-      catVideos.sort((a, b) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
-      catVideos.forEach((v, i) => map.set(v.tiktok_id, i + 1));
     }
     setEpMap(map);
   }, [videos]);
@@ -1343,7 +1373,7 @@ export default function Home() {
       </footer>
 
       <button id="backToTop" className={showTop ? "visible" : ""} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">↑</button>
-      {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} onClose={() => setSelectedVideo(null)}
+      {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
         userSession={userSession}
         savedWordIds={new Set(savedWords.map(w => w.id))}
         onSaveWord={userSession ? async (wordId, wordData) => {
