@@ -59,21 +59,37 @@ function getWordTH(item: string | RichWord): string {
 }
 
 // Text-to-speech helper (uses browser built-in Web Speech API — free, no API key)
-function speakWord(text: string) {
+function speakWord(text: string, lang: "en" | "th" = "en") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = 0.85;
-  utterance.pitch = 1;
-  // Try to use a natural-sounding voice
+  utterance.lang = lang === "th" ? "th-TH" : "en-US";
+  utterance.rate = lang === "th" ? 0.9 : 0.82;
+  utterance.pitch = lang === "th" ? 1.0 : 1.05;
+  // Try to use the most natural-sounding voice available
   const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v => v.lang.startsWith("en") && v.name.includes("Google")) ??
-    voices.find(v => v.lang.startsWith("en-US")) ??
-    voices.find(v => v.lang.startsWith("en"));
+  let preferred: SpeechSynthesisVoice | undefined;
+  if (lang === "th") {
+    preferred = voices.find(v => v.lang.startsWith("th") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("th") && v.localService === false) ??
+      voices.find(v => v.lang.startsWith("th"));
+  } else {
+    // Prefer premium/natural voices (Samantha, Google UK English, Daniel, etc.)
+    preferred = voices.find(v => v.lang.startsWith("en") && /Natural|Premium|Enhanced/i.test(v.name)) ??
+      voices.find(v => v.lang.startsWith("en") && v.name.includes("Samantha")) ??
+      voices.find(v => v.lang.startsWith("en") && v.name.includes("Daniel")) ??
+      voices.find(v => v.lang.startsWith("en-US") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("en-GB") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("en") && v.localService === false) ??
+      voices.find(v => v.lang.startsWith("en-US")) ??
+      voices.find(v => v.lang.startsWith("en"));
+  }
   if (preferred) utterance.voice = preferred;
   window.speechSynthesis.speak(utterance);
 }
+
+// Short alias for Thai speech
+function speakThai(text: string) { speakWord(text, "th"); }
 
 interface Video {
   id: string;
@@ -220,7 +236,7 @@ function VideoCard({ video, index, onClick, isAdmin, onEdit, onDelete, isFav, on
               <div className="card-flag">🇬🇧 English</div>
               <div className="card-def-en">{data.definitionEN}</div>
               <div className="card-flag" style={{ marginTop: 10 }}>🇹🇭 ภาษาไทย</div>
-              <div className="card-def-th">{data.definitionTH}</div>
+              <div className="card-def-th">{data.definitionTH} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakThai(data.definitionTH); }} title="ฟังภาษาไทย">🔊</button></div>
             </>
           ) : (
             <div className="card-def-en">{video.caption.slice(0, 160)}{video.caption.length > 160 ? "…" : ""}</div>
@@ -484,7 +500,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
               <div className="modal-section">
                 <div className="section-label"><span className="icon">📖</span>ความหมาย · Definition</div>
                 <div className="def-box en"><div className="def-lang">🇬🇧 English</div><div className="def-text">{data.definitionEN} <button className="speak-btn-sm" onClick={() => speakWord(data.definitionEN)} title="Listen">🔊</button></div></div>
-                <div className="def-box th"><div className="def-lang">🇹🇭 ภาษาไทย</div><div className="def-text">{data.definitionTH}</div></div>
+                <div className="def-box th"><div className="def-lang">🇹🇭 ภาษาไทย</div><div className="def-text">{data.definitionTH} <button className="speak-btn-sm" onClick={() => speakThai(data.definitionTH)} title="ฟังภาษาไทย">🔊</button></div></div>
               </div>
 
               {/* Synonyms & Antonyms */}
@@ -498,7 +514,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const sSaved = savedWordIds?.has(sId);
                     return <span key={i} className={`chip chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
                       onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Means the same as "${data.idiom}" — ${data.definitionEN}`, definitionTH: rw.meaningTH || data.definitionTH, example: rw.example })}
-                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th" onClick={(e) => { e.stopPropagation(); speakThai(rw.meaningTH); }} title="ฟังภาษาไทย" style={{ cursor: "pointer" }}>{rw.meaningTH} 🔊</span>}</span>;
                   })}</div>
                 </div>
                 <div>
@@ -509,7 +525,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                     const aSaved = savedWordIds?.has(aId);
                     return <span key={i} className={`chip chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
                       onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: data.cefr, pos: rw.pos || data.partOfSpeech, definitionEN: rw.meaningEN || `Opposite of "${data.idiom}" — means NOT ${data.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${data.idiom}" — ${data.definitionTH}`, example: rw.example })}
-                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                    ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th" onClick={(e) => { e.stopPropagation(); speakThai(rw.meaningTH); }} title="ฟังภาษาไทย" style={{ cursor: "pointer" }}>{rw.meaningTH} 🔊</span>}</span>;
                   })}</div>
                 </div>
               </div>
@@ -548,7 +564,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                           </div>
                         </div>
                         <div className="keyword-def-en">🇬🇧 {kw.definitionEN} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(kw.definitionEN); }} title="Listen">🔊</button></div>
-                        <div className="keyword-def-th">🇹🇭 {kw.definitionTH}</div>
+                        <div className="keyword-def-th">🇹🇭 {kw.definitionTH} <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakThai(kw.definitionTH); }} title="ฟังภาษาไทย">🔊</button></div>
                         {kw.synonyms.length > 0 && (
                           <div className="keyword-syn-row">
                             <div className="keyword-syn-label">Synonyms</div>
@@ -558,7 +574,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const sSaved = savedWordIds?.has(sId);
                               return <span key={j} className={`mini-chip mini-chip-syn chip-rich ${onSaveWord ? "clickable" : ""} ${sSaved ? "saved" : ""}`}
                                 onClick={() => onSaveWord && !sSaved && onSaveWord(sId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Means the same as "${kw.word}" — ${kw.definitionEN}`, definitionTH: rw.meaningTH || kw.definitionTH, example: rw.example })}
-                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !sSaved && " +"}</span>{rw.meaningTH && <span className="chip-th" onClick={(e) => { e.stopPropagation(); speakThai(rw.meaningTH); }} title="ฟังภาษาไทย" style={{ cursor: "pointer" }}>{rw.meaningTH} 🔊</span>}</span>;
                             })}</div>
                           </div>
                         )}
@@ -571,7 +587,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                               const aSaved = savedWordIds?.has(aId);
                               return <span key={j} className={`mini-chip mini-chip-ant chip-rich ${onSaveWord ? "clickable" : ""} ${aSaved ? "saved" : ""}`}
                                 onClick={() => onSaveWord && !aSaved && onSaveWord(aId, { word: rw.word, cefr: kw.cefr, pos: rw.pos || kw.pos, definitionEN: rw.meaningEN || `Opposite of "${kw.word}" — means NOT ${kw.definitionEN.toLowerCase()}`, definitionTH: rw.meaningTH || `ตรงข้ามกับ "${kw.word}" — ${kw.definitionTH}`, example: rw.example })}
-                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th">{rw.meaningTH}</span>}</span>;
+                              ><span className="chip-word">{rw.word}<button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(rw.word); }} title="Listen">🔊</button>{onSaveWord && !aSaved && " +"}</span>{rw.meaningTH && <span className="chip-th" onClick={(e) => { e.stopPropagation(); speakThai(rw.meaningTH); }} title="ฟังภาษาไทย" style={{ cursor: "pointer" }}>{rw.meaningTH} 🔊</span>}</span>;
                             })}</div>
                           </div>
                         )}
@@ -595,7 +611,7 @@ function DetailModal({ video, index, onClose, userSession, savedWordIds, onSaveW
                         <div key={i} className="example-item">
                           <div className="example-num">{i + 1}</div>
                           <div className="example-en"><span dangerouslySetInnerHTML={{ __html: `"${highlighted}"` }} /> <button className="speak-btn-sm" onClick={() => speakWord(ex.en)} title="Listen">🔊</button></div>
-                          <div className="example-th">{ex.th}</div>
+                          <div className="example-th">{ex.th} <button className="speak-btn-sm" onClick={() => speakThai(ex.th)} title="ฟังภาษาไทย">🔊</button></div>
                         </div>
                       );
                     })}

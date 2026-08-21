@@ -5,20 +5,33 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // Text-to-speech helper
-function speakWord(text: string) {
+function speakWord(text: string, lang: "en" | "th" = "en") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = 0.85;
-  utterance.pitch = 1;
+  utterance.lang = lang === "th" ? "th-TH" : "en-US";
+  utterance.rate = lang === "th" ? 0.9 : 0.82;
+  utterance.pitch = lang === "th" ? 1.0 : 1.05;
   const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v => v.lang.startsWith("en") && v.name.includes("Google")) ??
-    voices.find(v => v.lang.startsWith("en-US")) ??
-    voices.find(v => v.lang.startsWith("en"));
+  let preferred: SpeechSynthesisVoice | undefined;
+  if (lang === "th") {
+    preferred = voices.find(v => v.lang.startsWith("th") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("th") && v.localService === false) ??
+      voices.find(v => v.lang.startsWith("th"));
+  } else {
+    preferred = voices.find(v => v.lang.startsWith("en") && /Natural|Premium|Enhanced/i.test(v.name)) ??
+      voices.find(v => v.lang.startsWith("en") && v.name.includes("Samantha")) ??
+      voices.find(v => v.lang.startsWith("en") && v.name.includes("Daniel")) ??
+      voices.find(v => v.lang.startsWith("en-US") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("en-GB") && v.name.includes("Google")) ??
+      voices.find(v => v.lang.startsWith("en") && v.localService === false) ??
+      voices.find(v => v.lang.startsWith("en-US")) ??
+      voices.find(v => v.lang.startsWith("en"));
+  }
   if (preferred) utterance.voice = preferred;
   window.speechSynthesis.speak(utterance);
 }
+function speakThai(text: string) { speakWord(text, "th"); }
 
 interface WordItem {
   id: string;
@@ -220,8 +233,8 @@ export default function DeckPage() {
                   <div className="flashcard-cefr" style={{ background: CEFR_COLORS[currentCard?.cefr ?? "B1"] }}>{currentCard?.cefr}</div>
                   <div className="flashcard-word" style={{ fontSize: 20 }}>{currentCard?.front}</div>
                   {currentCard?.pos && <div className="flashcard-pos">{currentCard.pos}</div>}
-                  <div className="flashcard-def-en">🇬🇧 {currentCard?.backEN}</div>
-                  <div className="flashcard-def-th">🇹🇭 {currentCard?.backTH}</div>
+                  <div className="flashcard-def-en">🇬🇧 {currentCard?.backEN} {currentCard?.backEN && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakWord(currentCard.backEN); }} title="Listen">🔊</button>}</div>
+                  <div className="flashcard-def-th">🇹🇭 {currentCard?.backTH} {currentCard?.backTH && <button className="speak-btn-sm" onClick={(e) => { e.stopPropagation(); speakThai(currentCard.backTH); }} title="ฟังภาษาไทย">🔊</button>}</div>
                   {currentCard?.example && <div className="flashcard-example">💬 {currentCard.example}</div>}
                 </div>
               </div>
@@ -294,8 +307,8 @@ export default function DeckPage() {
                   {w.data.pos && <span className="tag tag-pos" style={{ fontSize: 10 }}>{w.data.pos}</span>}
                   <button className="deck-remove-btn" onClick={() => handleRemoveWord(w.id)}>✕</button>
                 </div>
-                <div className="deck-word-def-en">🇬🇧 {w.data.definitionEN}</div>
-                <div className="deck-word-def-th">🇹🇭 {w.data.definitionTH}</div>
+                <div className="deck-word-def-en">🇬🇧 {w.data.definitionEN} <button className="speak-btn-sm" onClick={() => speakWord(w.data.definitionEN ?? "")} title="Listen">🔊</button></div>
+                <div className="deck-word-def-th">🇹🇭 {w.data.definitionTH} <button className="speak-btn-sm" onClick={() => speakThai(w.data.definitionTH ?? "")} title="ฟังภาษาไทย">🔊</button></div>
                 {"example" in (w.data as object) && (w.data as Record<string, string>).example && (
                   <div className="deck-word-extra" style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>Ex: {(w.data as Record<string, string>).example}</div>
                 )}
@@ -324,8 +337,8 @@ export default function DeckPage() {
                   <span className={`tag tag-cefr ${i.cefr}`} style={{ fontSize: 10 }}>{i.cefr}</span>
                   <button className="deck-remove-btn" onClick={() => handleRemoveIdiom(i.tiktokId)}>✕</button>
                 </div>
-                <div className="deck-word-def-en">🇬🇧 {i.definitionEN}</div>
-                <div className="deck-word-def-th">🇹🇭 {i.definitionTH}</div>
+                <div className="deck-word-def-en">🇬🇧 {i.definitionEN} <button className="speak-btn-sm" onClick={() => speakWord(i.definitionEN)} title="Listen">🔊</button></div>
+                <div className="deck-word-def-th">🇹🇭 {i.definitionTH} <button className="speak-btn-sm" onClick={() => speakThai(i.definitionTH)} title="ฟังภาษาไทย">🔊</button></div>
               </div>
             ))}
           </div>
