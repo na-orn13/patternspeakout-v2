@@ -3121,3 +3121,27 @@ mark.vocab-hl {
   .vocab-annot-label { font-size: 9.5px; }
   .vocab-popover.anchored { width: calc(100vw - 24px) !important; left: 12px !important; }
 }
+
+
+/* ===== SHARE BUTTON (per-item share link) ===== */
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--slate);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.share-btn:hover {
+  background: var(--slate);
+  color: white;
+  border-color: var(--slate);
+}

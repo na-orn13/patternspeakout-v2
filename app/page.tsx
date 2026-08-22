@@ -1142,9 +1142,9 @@ function renderAnnotatedParagraph(
   return <>{nodes}</>;
 }
 
-function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds, onSaveWord, onGuestSave }: {
+function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, onShare, savedWordIds, onSaveWord, onGuestSave }: {
   video: Video; epNumber: number; onClose: () => void;
-  isAdmin?: boolean; onEdit?: () => void;
+  isAdmin?: boolean; onEdit?: () => void; onShare?: () => void;
   savedWordIds?: Set<string>;
   onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void;
   onGuestSave?: () => void;
@@ -1241,9 +1241,12 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
             {data.author && <span>✍️ {data.author}</span>}
             {data.source && <span className="article-source">📚 Source: {data.source}</span>}
           </div>
-          {isAdmin && onEdit && (
-            <button className="edit-add-btn" style={{ marginTop: 10 }} onClick={onEdit}>✏️ Edit article</button>
-          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            {onShare && <button className="share-btn" onClick={onShare} aria-label="Share this article">🔗 Share</button>}
+            {isAdmin && onEdit && (
+              <button className="edit-add-btn" onClick={onEdit}>✏️ Edit article</button>
+            )}
+          </div>
         </div>
 
         <div className="modal-body article-body">
@@ -1321,7 +1324,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
 }
 
 // ─── Rich Detail Modal ────────────────────────────────────────────────────────
-function DetailModal({ video, index, epNumber, onClose, userSession, savedWordIds, onSaveWord }: { video: Video; index: number; epNumber: number; onClose: () => void; userSession?: { id: string } | null; savedWordIds?: Set<string>; onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void }) {
+function DetailModal({ video, index, epNumber, onClose, onShare, userSession, savedWordIds, onSaveWord }: { video: Video; index: number; epNumber: number; onClose: () => void; onShare?: () => void; userSession?: { id: string } | null; savedWordIds?: Set<string>; onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void }) {
   const color = colorFor(video, index);
   const emoji = emojiFor(video, index);
   const data = getIdiomData(video);
@@ -1351,6 +1354,7 @@ function DetailModal({ video, index, epNumber, onClose, userSession, savedWordId
                 {data?.cefr && <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>}
                 {data?.partOfSpeech && <span className="tag tag-pos">{data.partOfSpeech}</span>}
               </div>
+              {onShare && <button className="share-btn" style={{ marginTop: 10 }} onClick={onShare} aria-label="Share this item">🔗 Share</button>}
             </div>
           </div>
         </div>
@@ -2016,6 +2020,64 @@ export default function Home() {
 
   useEffect(() => { fetchVideos(); pollTimer.current = setInterval(() => fetchVideos(true), POLL_INTERVAL_MS); return () => { if (pollTimer.current) clearInterval(pollTimer.current); }; }, [fetchVideos]);
 
+  // ── Per-item share links: /?item=<tiktok_id> ──────────────────────────────
+  // Build the shareable URL for a given item id.
+  const buildShareUrl = useCallback((tiktokId: string) => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}${window.location.pathname}?item=${encodeURIComponent(tiktokId)}`;
+  }, []);
+
+  // Open an item by video object, syncing the URL (no reload/scroll).
+  const openItem = useCallback((video: Video, index: number) => {
+    setSelectedVideo({ video, index });
+    if (typeof window !== "undefined") {
+      const url = `${window.location.pathname}?item=${encodeURIComponent(video.tiktok_id)}`;
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
+
+  // Close the modal and clear the ?item= param.
+  const closeItem = useCallback(() => {
+    setSelectedVideo(null);
+    if (typeof window !== "undefined" && window.location.search.includes("item=")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  // Native share (mobile) or clipboard copy, with toast feedback.
+  const shareItem = useCallback(async (tiktokId: string, title: string) => {
+    const url = buildShareUrl(tiktokId);
+    if (!url) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title, url });
+        return;
+      }
+    } catch { /* user cancelled native share — fall through to copy */ }
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast("Link copied to clipboard", "success");
+    } catch { showToast("Could not copy link", "error"); }
+  }, [buildShareUrl, showToast]);
+
+  // Auto-open the item referenced by ?item= once videos have loaded (once).
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    if (typeof window === "undefined" || videos.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const itemId = params.get("item");
+    if (!itemId) { deepLinkedRef.current = true; return; }
+    const idx = videos.findIndex(v => v.tiktok_id === itemId);
+    if (idx !== -1) {
+      const data = getIdiomData(videos[idx]);
+      const cat = data ? (data as unknown as Record<string, string>).category || "idiom" : "idiom";
+      setCategory(cat === "articles" || cat === "idiom" || cat === "howtosay" || cat === "motto" ? cat : "all");
+      setSelectedVideo({ video: videos[idx], index: idx });
+    }
+    deepLinkedRef.current = true;
+  }, [videos]);
+
   // Analytics helper
   const trackEvent = useCallback((eventType: string, eventData?: Record<string, unknown>) => {
     const sessionId = sessionStorage.getItem("deck_userId") || "anon_" + Math.random().toString(36).slice(2);
@@ -2253,7 +2315,7 @@ export default function Home() {
             const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Inspiring" : cat === "articles" ? "Article" : cat;
             return (
             <VideoCard key={video.id} video={video} index={i}
-              onClick={() => setSelectedVideo({ video, index: i })}
+              onClick={() => openItem(video, i)}
               isAdmin={!!adminToken}
               epNumber={epMap.get(video.tiktok_id) ?? (i + 1)}
               categoryLabel={catLabel}
@@ -2297,9 +2359,10 @@ export default function Home() {
 
       <button id="backToTop" className={showTop ? "visible" : ""} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">↑</button>
       {selectedVideo && (isArticleData(getIdiomData(selectedVideo.video)) ? (
-        <ArticleModal video={selectedVideo.video} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
+        <ArticleModal video={selectedVideo.video} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={closeItem}
           isAdmin={!!adminToken}
-          onEdit={() => { const v = selectedVideo.video; setSelectedVideo(null); setEditingVideo(v); }}
+          onEdit={() => { const v = selectedVideo.video; closeItem(); setEditingVideo(v); }}
+          onShare={() => shareItem(selectedVideo.video.tiktok_id, getIdiomData(selectedVideo.video)?.idiom ?? selectedVideo.video.title)}
           savedWordIds={new Set(savedWords.map(w => w.id))}
           onSaveWord={userSession ? async (wordId, wordData) => {
             try {
@@ -2311,8 +2374,9 @@ export default function Home() {
           onGuestSave={() => showToast("Please sign in to save to your deck", "error")}
         />
       ) : (
-        <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
+        <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={closeItem}
           userSession={userSession}
+          onShare={() => shareItem(selectedVideo.video.tiktok_id, getIdiomData(selectedVideo.video)?.idiom ?? selectedVideo.video.title)}
           savedWordIds={new Set(savedWords.map(w => w.id))}
           onSaveWord={userSession ? async (wordId, wordData) => {
             try {
