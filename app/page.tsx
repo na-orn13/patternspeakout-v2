@@ -193,6 +193,105 @@ function getIdiomData(video: Video): IdiomData | null {
   return null;
 }
 
+// ─── Article types ──────────────────────────────────────────────────────────
+// Articles reuse the same `videos` table + `summary` JSON model as idioms.
+// An article keeps `idiom` (=title) and `definitionEN`/`definitionTH` (=short
+// summary) populated so getIdiomData recognises it, and adds article fields.
+interface ArticleVocab {
+  phrase: string;        // exact word/phrase as it appears in the passage
+  headword: string;      // normalised dictionary form
+  cefr: string;
+  pos: string;
+  meaningEN: string;
+  meaningTH: string;
+  exampleEN: string;
+  exampleTH: string;
+  pronunciation?: string; // if different from displayed form
+}
+
+interface ArticleData extends IdiomData {
+  isArticle: true;
+  author?: string;
+  source?: string;          // reference / source of data
+  readingTime?: string;     // e.g. "6 min"
+  articleCategory?: string;  // e.g. "Technology & Society"
+  bodyEN: string[];         // paragraphs (English)
+  bodyTH: string[];         // paragraphs (Thai)
+  vocabulary: ArticleVocab[];
+}
+
+function isArticleData(d: IdiomData | null): d is ArticleData {
+  return !!d && (d as ArticleData).isArticle === true;
+}
+
+const CEFR_COLOR_MAP: Record<string, string> = { A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" };
+const VALID_CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"];
+const ARTICLE_CATEGORIES = ["Technology & Society", "Grammar", "Vocabulary", "Pronunciation", "Culture", "Learning Tips", "Business", "Science", "Health", "Environment"];
+
+// The EXACT JSON schema this website imports for an article (stored in videos.summary).
+const ARTICLE_SCHEMA_JSON = `{
+  "isArticle": true,
+  "category": "articles",
+  "idiom": "<ARTICLE TITLE — keep this field name>",
+  "cefr": "<A1|A2|B1|B2|C1|C2 — overall level>",
+  "partOfSpeech": "article",
+  "articleCategory": "<one of: Technology & Society, Grammar, Vocabulary, Pronunciation, Culture, Learning Tips, Business, Science, Health, Environment>",
+  "author": "<writer name or 'Original content'>",
+  "source": "<reference/source of data, journal, URL, or 'Original content'>",
+  "readingTime": "<e.g. 6 min>",
+  "date": "<YYYY-MM-DD>",
+  "thumbnail": "📰",
+  "definitionEN": "<one-sentence English summary shown on the card>",
+  "definitionTH": "<one-sentence Thai summary>",
+  "bodyEN": ["<English paragraph 1>", "<English paragraph 2>", "..."],
+  "bodyTH": ["<Thai paragraph 1 — natural translation, same order>", "<Thai paragraph 2>", "..."],
+  "vocabulary": [
+    {
+      "phrase": "<EXACT word/phrase as it appears in bodyEN>",
+      "headword": "<normalised dictionary form>",
+      "cefr": "<A1|A2|B1|B2|C1|C2>",
+      "pos": "<part of speech>",
+      "meaningEN": "<concise English meaning>",
+      "meaningTH": "<natural Thai meaning>",
+      "exampleEN": "<English example sentence>",
+      "exampleTH": "<Thai translation of the example>",
+      "pronunciation": "<optional: pronunciation text if different from phrase>"
+    }
+  ],
+  "synonyms": [],
+  "antonyms": [],
+  "keyWords": [],
+  "examples": [],
+  "usage": "",
+  "context": ""
+}`;
+
+const ARTICLE_AI_PROMPT = `Refine the draft below into a clear bilingual learning article for this website.
+
+Requirements:
+- Preserve the author's main argument and voice while correcting grammar, repetition, and unnatural phrasing.
+- Produce polished English and a natural Thai translation.
+- Assign an overall CEFR level (A1–C2).
+- Split the article into paragraphs. bodyEN and bodyTH MUST have the same number of paragraphs, in the same order.
+- Select useful CEFR vocabulary from EXACT phrases appearing in the final English passage (bodyEN).
+- For each vocabulary item, provide its CEFR level, part of speech, concise English and Thai meanings, an English example, and its Thai translation. Each highlighted vocabulary can be clicked to add to the flashcard deck.
+- Do not annotate words that do not appear in the final passage. The "phrase" value MUST match the text in bodyEN exactly.
+- Keep the "idiom" field name for the title, and set "isArticle": true and "category": "articles".
+- Return valid RAW JSON matching the schema below ONLY. Do NOT include Markdown, code fences, comments, or explanatory text.
+- Preserve Thai Unicode characters correctly.
+
+DRAFT:
+[PASTE DRAFT HERE]
+
+JSON SCHEMA:
+${ARTICLE_SCHEMA_JSON}`;
+
+// Basic HTML/script safety check for imported content
+function containsUnsafeHtml(s: string): boolean {
+  return /<\s*(script|iframe|object|embed|style|link|meta)\b/i.test(s) ||
+    /\bon\w+\s*=/i.test(s) || /javascript:/i.test(s);
+}
+
 function colorFor(video: Video, i: number) {
   const data = getIdiomData(video);
   if (data?.color) return data.color;
@@ -355,6 +454,9 @@ function EditModal({ video, token, onClose, onSaved, onToast }: {
     const body = {
       tiktokId: video.tiktok_id,
       data: {
+        // Preserve any existing fields (category, article fields, etc.) that
+        // this form does not edit, then override the edited ones.
+        ...(data ?? {}),
         idiom: idiom.trim(),
         cefr, partOfSpeech,
         episode: episode.trim() || undefined,
@@ -518,6 +620,587 @@ function EditModal({ video, token, onClose, onSaved, onToast }: {
             <button className="admin-action-btn" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }} onClick={onClose}>Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Article Edit Modal (manual click-to-edit, like idioms) ────────────────────
+function ArticleEditModal({ video, token, onClose, onSaved, onToast }: {
+  video: Video | null; token: string; onClose: () => void; onSaved: () => void; onToast: (m: string, t: "success"|"error") => void;
+}) {
+  const existing = video ? (getIdiomData(video) as ArticleData | null) : null;
+  const [title, setTitle] = useState(existing?.idiom ?? "");
+  const [cefr, setCefr] = useState(existing?.cefr ?? "B2");
+  const [articleCategory, setArticleCategory] = useState(existing?.articleCategory ?? "Technology & Society");
+  const [author, setAuthor] = useState(existing?.author ?? "");
+  const [source, setSource] = useState(existing?.source ?? "");
+  const [readingTime, setReadingTime] = useState(existing?.readingTime ?? "");
+  const [date, setDate] = useState(existing?.date ?? new Date().toISOString().split("T")[0]);
+  const [thumbnail, setThumbnail] = useState(existing?.thumbnail ?? "📰");
+  const [summaryEN, setSummaryEN] = useState(existing?.definitionEN ?? "");
+  const [summaryTH, setSummaryTH] = useState(existing?.definitionTH ?? "");
+  // Paragraphs joined with blank line between them for editing
+  const [bodyEN, setBodyEN] = useState((existing?.bodyEN ?? []).join("\n\n"));
+  const [bodyTH, setBodyTH] = useState((existing?.bodyTH ?? []).join("\n\n"));
+  const [vocab, setVocab] = useState<ArticleVocab[]>(existing?.vocabulary ?? []);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+
+  const addVocab = () => setVocab([...vocab, { phrase: "", headword: "", cefr: "B1", pos: "noun", meaningEN: "", meaningTH: "", exampleEN: "", exampleTH: "", pronunciation: "" }]);
+  const removeVocab = (i: number) => setVocab(vocab.filter((_, j) => j !== i));
+  const updateVocab = (i: number, field: keyof ArticleVocab, val: string) => { const copy = [...vocab]; copy[i] = { ...copy[i], [field]: val }; setVocab(copy); };
+
+  const handleSave = async () => {
+    if (!title.trim() || !summaryEN.trim()) { onToast("Title and English summary are required.", "error"); return; }
+    if (!VALID_CEFR.includes(cefr)) { onToast("Invalid CEFR level.", "error"); return; }
+    const paraEN = bodyEN.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+    const paraTH = bodyTH.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+    const cleanVocab = vocab
+      .filter(v => v.phrase.trim())
+      .map(v => ({
+        phrase: v.phrase.trim(),
+        headword: (v.headword || v.phrase).trim(),
+        cefr: VALID_CEFR.includes(v.cefr) ? v.cefr : "B1",
+        pos: v.pos.trim(),
+        meaningEN: v.meaningEN.trim(),
+        meaningTH: v.meaningTH.trim(),
+        exampleEN: v.exampleEN.trim(),
+        exampleTH: v.exampleTH.trim(),
+        pronunciation: v.pronunciation?.trim() || undefined,
+      }));
+    setSaving(true);
+    const data: ArticleData = {
+      ...(existing ?? {} as ArticleData),
+      isArticle: true,
+      category: "articles",
+      idiom: title.trim(),
+      cefr,
+      partOfSpeech: "article",
+      articleCategory: articleCategory.trim(),
+      author: author.trim() || undefined,
+      source: source.trim() || undefined,
+      readingTime: readingTime.trim() || undefined,
+      date: date.trim() || undefined,
+      thumbnail: thumbnail.trim() || "📰",
+      definitionEN: summaryEN.trim(),
+      definitionTH: summaryTH.trim(),
+      bodyEN: paraEN,
+      bodyTH: paraTH,
+      vocabulary: cleanVocab,
+      // Keep idiom-shape fields present so nothing else breaks
+      synonyms: existing?.synonyms ?? [],
+      antonyms: existing?.antonyms ?? [],
+      keyWords: existing?.keyWords ?? [],
+      examples: existing?.examples ?? [],
+      usage: existing?.usage ?? "",
+      context: existing?.context ?? "",
+    };
+    try {
+      let res: Response;
+      if (video) {
+        res = await fetch("/api/idioms/edit", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ tiktokId: video.tiktok_id, data }) });
+      } else {
+        res = await fetch("/api/idioms/add", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      }
+      const result = await res.json();
+      if (!res.ok) { onToast(`Save failed: ${result.error}`, "error"); return; }
+      onToast(`✅ Article "${title}" saved!`, "success");
+      onSaved(); onClose();
+    } catch { onToast("Network error.", "error"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+      <div className="modal" style={{ maxWidth: 720 }}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="modal-hero" style={{ padding: "24px 32px", background: "var(--off-white)" }}>
+          <div className="modal-idiom-name" style={{ fontSize: 20 }}>📰 {video ? "Edit" : "New"} Article: {title || "Untitled"}</div>
+        </div>
+        <div className="modal-body" style={{ padding: "24px 32px", gap: 18, maxHeight: "72vh", overflowY: "auto" }}>
+
+          <div className="edit-row">
+            <div className="edit-field" style={{ flex: 3 }}>
+              <label className="edit-label">Title *</label>
+              <input className="edit-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="The Future of Work…" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">CEFR</label>
+              <select className="edit-input" value={cefr} onChange={e => setCefr(e.target.value)}>
+                {VALID_CEFR.map(l => <option key={l}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="edit-row">
+            <div className="edit-field" style={{ flex: 2 }}>
+              <label className="edit-label">Category</label>
+              <input className="edit-input" value={articleCategory} onChange={e => setArticleCategory(e.target.value)} placeholder="Technology & Society" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Reading time</label>
+              <input className="edit-input" value={readingTime} onChange={e => setReadingTime(e.target.value)} placeholder="6 min" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Emoji</label>
+              <input className="edit-input" value={thumbnail} onChange={e => setThumbnail(e.target.value)} placeholder="📰" style={{ fontSize: 18, textAlign: "center" }} />
+            </div>
+          </div>
+
+          <div className="edit-row">
+            <div className="edit-field" style={{ flex: 2 }}>
+              <label className="edit-label">✍️ Author / Writer</label>
+              <input className="edit-input" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Author name" />
+            </div>
+            <div className="edit-field">
+              <label className="edit-label">Date</label>
+              <input className="edit-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="edit-field">
+            <label className="edit-label">📚 Reference / Source of data</label>
+            <input className="edit-input" value={source} onChange={e => setSource(e.target.value)} placeholder="e.g. Original essay, journal name, URL, or 'Original content'" />
+          </div>
+
+          <div className="edit-field">
+            <label className="edit-label">🇬🇧 Short summary (English) *</label>
+            <textarea className="edit-input" rows={2} value={summaryEN} onChange={e => setSummaryEN(e.target.value)} placeholder="One-line summary shown on the card." />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label">🇹🇭 สรุปสั้น (ไทย)</label>
+            <textarea className="edit-input" rows={2} value={summaryTH} onChange={e => setSummaryTH(e.target.value)} placeholder="สรุปสั้นๆ ที่แสดงบนการ์ด" />
+          </div>
+
+          <div className="edit-field">
+            <label className="edit-label">🇬🇧 Full article — English (separate paragraphs with a blank line)</label>
+            <textarea className="edit-input" rows={10} value={bodyEN} onChange={e => setBodyEN(e.target.value)} style={{ fontSize: 13, lineHeight: 1.6 }} placeholder={"First paragraph…\n\nSecond paragraph…"} />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label">🇹🇭 บทความเต็ม — ไทย (คั่นย่อหน้าด้วยบรรทัดว่าง)</label>
+            <textarea className="edit-input" rows={10} value={bodyTH} onChange={e => setBodyTH(e.target.value)} style={{ fontSize: 13, lineHeight: 1.6 }} placeholder={"ย่อหน้าแรก…\n\nย่อหน้าที่สอง…"} />
+          </div>
+
+          {/* Vocabulary */}
+          <div>
+            <div className="edit-label" style={{ marginBottom: 8 }}>🔑 CEFR Vocabulary (exact phrases from the passage)</div>
+            {vocab.map((v, i) => (
+              <div key={i} className="edit-keyword-block">
+                <div className="edit-row">
+                  <div className="edit-field" style={{ flex: 2 }}><input className="edit-input" value={v.phrase} onChange={e => updateVocab(i, "phrase", e.target.value)} placeholder="Phrase in passage" /></div>
+                  <div className="edit-field"><input className="edit-input" value={v.headword} onChange={e => updateVocab(i, "headword", e.target.value)} placeholder="Headword" /></div>
+                  <div className="edit-field">
+                    <select className="edit-input" value={v.cefr} onChange={e => updateVocab(i, "cefr", e.target.value)}>
+                      {VALID_CEFR.map(l => <option key={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <button className="edit-remove-btn" onClick={() => removeVocab(i)} title="Remove">✕</button>
+                </div>
+                <input className="edit-input" value={v.pos} onChange={e => updateVocab(i, "pos", e.target.value)} placeholder="Part of speech" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={v.meaningEN} onChange={e => updateVocab(i, "meaningEN", e.target.value)} placeholder="🇬🇧 English meaning" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={v.meaningTH} onChange={e => updateVocab(i, "meaningTH", e.target.value)} placeholder="🇹🇭 ความหมายไทย" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={v.exampleEN} onChange={e => updateVocab(i, "exampleEN", e.target.value)} placeholder="Example sentence (EN)" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={v.exampleTH} onChange={e => updateVocab(i, "exampleTH", e.target.value)} placeholder="ตัวอย่างประโยค (ไทย)" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={v.pronunciation ?? ""} onChange={e => updateVocab(i, "pronunciation", e.target.value)} placeholder="Pronunciation text (optional, if different)" />
+              </div>
+            ))}
+            <button className="edit-add-btn" onClick={addVocab}>+ Add vocabulary</button>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button className="admin-login-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>
+              {saving ? <><span className="spin">↻</span> Saving…</> : <>💾 Save Article</>}
+            </button>
+            <button className="admin-action-btn" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)" }} onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Article Import Modal (validate → preview → confirm publish / save draft) ──
+function ArticleImportModal({ token, existingIds, onClose, onSaved, onToast }: {
+  token: string; existingIds: Set<string>; onClose: () => void; onSaved: () => void; onToast: (m: string, t: "success"|"error") => void;
+}) {
+  const [jsonText, setJsonText] = useState("");
+  const [errors, setErrors] = useState<string[]>([]);
+  const [preview, setPreview] = useState<ArticleData | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+
+  const slugId = (title: string) => `article_${title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60)}`;
+
+  const validate = (): { ok: boolean; data?: ArticleData; errs: string[] } => {
+    const errs: string[] = [];
+    let parsed: unknown;
+    try { parsed = JSON.parse(jsonText); }
+    catch (e) { return { ok: false, errs: [`Invalid JSON: ${e instanceof Error ? e.message : "parse error"}`] }; }
+    if (!parsed || typeof parsed !== "object") return { ok: false, errs: ["Root must be a JSON object."] };
+    const p = parsed as Record<string, unknown>;
+
+    if (!p.idiom || typeof p.idiom !== "string" || !p.idiom.trim()) errs.push("Missing 'idiom' (article title).");
+    if (!p.definitionEN || typeof p.definitionEN !== "string") errs.push("Missing 'definitionEN' (English summary).");
+    if (!p.cefr || !VALID_CEFR.includes(p.cefr as string)) errs.push(`Invalid or missing 'cefr'. Must be one of ${VALID_CEFR.join(", ")}.`);
+    if (!Array.isArray(p.bodyEN) || (p.bodyEN as unknown[]).length === 0) errs.push("Missing 'bodyEN' (must be a non-empty array of paragraphs).");
+    if (p.bodyTH !== undefined && !Array.isArray(p.bodyTH)) errs.push("'bodyTH' must be an array of paragraphs.");
+    if (Array.isArray(p.bodyEN) && Array.isArray(p.bodyTH) && (p.bodyEN as unknown[]).length !== (p.bodyTH as unknown[]).length) {
+      errs.push(`bodyEN (${(p.bodyEN as unknown[]).length}) and bodyTH (${(p.bodyTH as unknown[]).length}) paragraph counts differ.`);
+    }
+    // Vocabulary validation
+    const vocab = Array.isArray(p.vocabulary) ? (p.vocabulary as Record<string, unknown>[]) : [];
+    const seenPhrases = new Set<string>();
+    const bodyText = (Array.isArray(p.bodyEN) ? (p.bodyEN as string[]).join(" ") : "").toLowerCase();
+    vocab.forEach((v, i) => {
+      if (!v.phrase || typeof v.phrase !== "string") { errs.push(`Vocabulary #${i + 1}: missing 'phrase'.`); return; }
+      if (v.cefr && !VALID_CEFR.includes(v.cefr as string)) errs.push(`Vocabulary #${i + 1} ('${v.phrase}'): invalid CEFR '${v.cefr}'.`);
+      const key = (v.phrase as string).toLowerCase();
+      if (seenPhrases.has(key)) errs.push(`Duplicate vocabulary phrase: '${v.phrase}'.`);
+      seenPhrases.add(key);
+      if (bodyText && !bodyText.includes(key)) errs.push(`Vocabulary '${v.phrase}' does not appear in bodyEN.`);
+    });
+    // HTML/script safety across all text fields
+    const allText = JSON.stringify(p);
+    if (containsUnsafeHtml(allText)) errs.push("Content contains unsafe HTML/script. Remove <script>, event handlers, or javascript: URLs.");
+    // Duplicate article id
+    if (typeof p.idiom === "string") {
+      const id = slugId(p.idiom);
+      if (existingIds.has(id)) errs.push(`An article with a matching ID already exists ('${id}'). Change the title or edit the existing article.`);
+    }
+
+    if (errs.length) return { ok: false, errs };
+
+    const data: ArticleData = {
+      isArticle: true,
+      category: "articles",
+      idiom: (p.idiom as string).trim(),
+      cefr: p.cefr as string,
+      partOfSpeech: "article",
+      articleCategory: (p.articleCategory as string) || "Article",
+      author: (p.author as string) || undefined,
+      source: (p.source as string) || undefined,
+      readingTime: (p.readingTime as string) || undefined,
+      date: (p.date as string) || new Date().toISOString().split("T")[0],
+      thumbnail: (p.thumbnail as string) || "📰",
+      definitionEN: (p.definitionEN as string).trim(),
+      definitionTH: (p.definitionTH as string) || "",
+      bodyEN: (p.bodyEN as string[]).map(s => String(s).trim()).filter(Boolean),
+      bodyTH: Array.isArray(p.bodyTH) ? (p.bodyTH as string[]).map(s => String(s).trim()).filter(Boolean) : [],
+      vocabulary: vocab.map(v => ({
+        phrase: String(v.phrase).trim(),
+        headword: String(v.headword || v.phrase).trim(),
+        cefr: (v.cefr as string) && VALID_CEFR.includes(v.cefr as string) ? (v.cefr as string) : "B1",
+        pos: String(v.pos || "").trim(),
+        meaningEN: String(v.meaningEN || "").trim(),
+        meaningTH: String(v.meaningTH || "").trim(),
+        exampleEN: String(v.exampleEN || "").trim(),
+        exampleTH: String(v.exampleTH || "").trim(),
+        pronunciation: v.pronunciation ? String(v.pronunciation).trim() : undefined,
+      })),
+      synonyms: [], antonyms: [], keyWords: [], examples: [],
+      usage: "", context: "",
+    };
+    return { ok: true, data, errs: [] };
+  };
+
+  const doValidate = () => {
+    const r = validate();
+    setErrors(r.errs);
+    setPreview(r.ok ? r.data! : null);
+  };
+
+  const doSave = async (asDraft: boolean) => {
+    const r = validate();
+    if (!r.ok || !r.data) { setErrors(r.errs); setPreview(null); return; }
+    setSaving(true);
+    const payload: ArticleData & { draft?: boolean } = { ...r.data };
+    if (asDraft) payload.draft = true;
+    try {
+      const res = await fetch("/api/idioms/add", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!res.ok) { setErrors([result.error || "Save failed."]); return; }
+      onToast(asDraft ? `📝 Draft saved: "${r.data.idiom}"` : `✅ Article published: "${r.data.idiom}"`, "success");
+      onSaved(); onClose();
+    } catch { setErrors(["Network error."]); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+      <div className="modal" style={{ maxWidth: 720 }}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="modal-hero" style={{ padding: "24px 32px", background: "var(--off-white)" }}>
+          <div className="modal-idiom-name" style={{ fontSize: 20 }}>📥 Import Article JSON</div>
+        </div>
+        <div className="modal-body" style={{ padding: "24px 32px", gap: 16, maxHeight: "72vh", overflowY: "auto" }}>
+          <p className="admin-hint">Paste JSON generated from the AI prompt. It will be validated before publishing. Nothing is saved until you confirm.</p>
+          <div className="admin-field">
+            <textarea className="admin-input" style={{ minHeight: 260, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, resize: "vertical" }}
+              value={jsonText} onChange={e => { setJsonText(e.target.value); setErrors([]); setPreview(null); }} placeholder="Paste article JSON here…" />
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="admin-action-btn" onClick={doValidate} disabled={!jsonText.trim()}>🔍 Validate &amp; Preview</button>
+          </div>
+
+          {errors.length > 0 && (
+            <div className="admin-result err" style={{ whiteSpace: "pre-line" }}>
+              <strong>Cannot import — fix these:</strong>{"\n"}{errors.map(e => `• ${e}`).join("\n")}
+            </div>
+          )}
+
+          {preview && (
+            <div className="article-import-preview">
+              <div className="admin-section-label">✅ Preview</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                <span className="article-category-badge">{preview.articleCategory}</span>
+                <span className={`tag tag-cefr ${preview.cefr}`}>{preview.cefr}</span>
+                {preview.readingTime && <span className="article-meta-text">⏱ {preview.readingTime}</span>}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: "var(--slate)", marginBottom: 4 }}>{preview.idiom}</div>
+              <div className="article-byline" style={{ marginBottom: 8 }}>
+                {preview.author && <span>✍️ {preview.author}</span>}
+                {preview.source && <span className="article-source">📚 {preview.source}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6 }}>🇬🇧 {preview.definitionEN}</div>
+              {preview.definitionTH && <div style={{ fontSize: 13, color: "var(--slate)", marginBottom: 6, fontFamily: "'Kanit', sans-serif" }}>🇹🇭 {preview.definitionTH}</div>}
+              <div className="admin-hint">{preview.bodyEN.length} EN paragraph(s) · {preview.bodyTH.length} TH paragraph(s) · {preview.vocabulary.length} vocabulary item(s)</div>
+              {preview.vocabulary.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                  {preview.vocabulary.map((v, i) => <span key={i} className={`tag tag-cefr ${v.cefr}`} style={{ fontSize: 10 }}>{v.phrase}</span>)}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button className="admin-login-btn" style={{ flex: 1 }} onClick={() => doSave(false)} disabled={saving}>
+                  {saving ? <><span className="spin">↻</span> Publishing…</> : <>🚀 Confirm &amp; Publish</>}
+                </button>
+                <button className="admin-action-btn" onClick={() => doSave(true)} disabled={saving}>📝 Save as draft</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Article Modal ────────────────────────────────────────────────────────────
+// Renders a full bilingual article with per-paragraph highlight during playback,
+// playback controls (play/pause/resume/restart/stop), and inline CEFR vocabulary
+// annotations that open full details and can be saved to the flashcard deck.
+function renderAnnotatedParagraph(
+  paragraph: string,
+  vocab: ArticleVocab[],
+  onOpenVocab: (v: ArticleVocab) => void
+) {
+  if (!vocab.length) return <>{paragraph}</>;
+  const phrases = [...vocab].sort((a, b) => b.phrase.length - a.phrase.length);
+  const nodes: React.ReactNode[] = [];
+  let remaining = paragraph;
+  let key = 0;
+  while (remaining.length > 0) {
+    let matchIdx = -1;
+    let matched: ArticleVocab | null = null;
+    for (const v of phrases) {
+      if (!v.phrase) continue;
+      const idx = remaining.toLowerCase().indexOf(v.phrase.toLowerCase());
+      if (idx !== -1 && (matchIdx === -1 || idx < matchIdx)) { matchIdx = idx; matched = v; }
+    }
+    if (matchIdx === -1 || !matched) { nodes.push(<span key={key++}>{remaining}</span>); break; }
+    if (matchIdx > 0) nodes.push(<span key={key++}>{remaining.slice(0, matchIdx)}</span>);
+    const actual = remaining.slice(matchIdx, matchIdx + matched.phrase.length);
+    const v = matched;
+    nodes.push(
+      <ruby key={key++} className="vocab-annot" tabIndex={0} role="button"
+        style={{ ["--vc-color" as string]: CEFR_COLOR_MAP[v.cefr] ?? "var(--slate)" }}
+        aria-label={`${v.phrase}, CEFR ${v.cefr}. ${v.meaningEN}. Open details`}
+        onClick={(e) => { e.stopPropagation(); onOpenVocab(v); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenVocab(v); } }}
+      >
+        {actual}
+        <rt className="vocab-annot-rt">{v.meaningTH || v.meaningEN}</rt>
+      </ruby>
+    );
+    remaining = remaining.slice(matchIdx + matched.phrase.length);
+  }
+  return <>{nodes}</>;
+}
+
+function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds, onSaveWord }: {
+  video: Video; epNumber: number; onClose: () => void;
+  isAdmin?: boolean; onEdit?: () => void;
+  savedWordIds?: Set<string>;
+  onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void;
+}) {
+  const data = getIdiomData(video) as ArticleData | null;
+  const cefrColor = data?.cefr ? (CEFR_COLOR_MAP[data.cefr] ?? "var(--slate)") : "var(--slate)";
+  const [lang, setLang] = useState<"en" | "th">("en");
+  const [playing, setPlaying] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [activePara, setActivePara] = useState(-1);
+  const [selectedVocab, setSelectedVocab] = useState<ArticleVocab | null>(null);
+  const stoppedRef = useRef(false);
+
+  useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); onClose(); } };
+    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+  useEffect(() => () => { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); }, []);
+
+  const paragraphs = lang === "en" ? (data?.bodyEN ?? []) : (data?.bodyTH ?? []);
+
+  const startPlayback = (fromStart = true) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const synthLang = lang === "th" ? "th-TH" : "en-US";
+    const voice = getVoice(lang);
+    if (lang === "th" && !voice) {
+      alert("No Thai voice is available on this device/browser. Please install a Thai system voice to hear the Thai passage.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    stoppedRef.current = false;
+    setPlaying(true); setPaused(false);
+    let idx = fromStart ? 0 : Math.max(0, activePara);
+    const speakPara = () => {
+      if (stoppedRef.current || idx >= paragraphs.length) { setPlaying(false); setActivePara(-1); return; }
+      setActivePara(idx);
+      const u = new SpeechSynthesisUtterance(paragraphs[idx]);
+      u.lang = synthLang;
+      u.rate = lang === "th" ? 0.9 : 0.86;
+      u.pitch = lang === "th" ? 1.0 : 1.03;
+      if (voice) u.voice = voice;
+      u.onend = () => { idx++; if (!stoppedRef.current) speakPara(); };
+      window.speechSynthesis.speak(u);
+    };
+    speakPara();
+  };
+
+  const pausePlayback = () => { if (window.speechSynthesis) { window.speechSynthesis.pause(); setPaused(true); } };
+  const resumePlayback = () => { if (window.speechSynthesis) { window.speechSynthesis.resume(); setPaused(false); } };
+  const stopPlayback = () => { stoppedRef.current = true; if (window.speechSynthesis) window.speechSynthesis.cancel(); setPlaying(false); setPaused(false); setActivePara(-1); };
+  const restartPlayback = () => { stopPlayback(); setTimeout(() => startPlayback(true), 60); };
+  const switchLang = (l: "en" | "th") => { stopPlayback(); setLang(l); };
+
+  if (!data) return null;
+
+  const vocabId = (v: ArticleVocab) => `word_${(v.headword || v.phrase).toLowerCase().replace(/\s+/g, "_")}`;
+
+  return (
+    <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) { stopPlayback(); onClose(); } }} role="dialog" aria-modal="true">
+      <div className="modal article-modal">
+        <button className="modal-close" onClick={() => { stopPlayback(); onClose(); }} aria-label="Close">✕</button>
+
+        <div className="article-hero">
+          <div className="article-meta-row">
+            <span className="article-category-badge">{data.articleCategory || "Article"}</span>
+            <span className={`tag tag-cefr ${data.cefr}`}>{data.cefr}</span>
+            <span className="article-meta-sep">·</span>
+            <span className="article-meta-text">{fmtDate(video.published_at)}</span>
+            {data.readingTime && <><span className="article-meta-sep">·</span><span className="article-meta-text">⏱ {data.readingTime}</span></>}
+            <span className="article-meta-text">EP.{String(epNumber).padStart(3, "0")}</span>
+          </div>
+          <h1 className="article-title" style={{ ["--vc-color" as string]: cefrColor }}>
+            {data.idiom} <button className="speak-btn" onClick={() => speakBilingual(data.idiom)} title="Listen" aria-label="Listen to title">🔊</button>
+          </h1>
+          <div className="article-byline">
+            {data.author && <span>✍️ {data.author}</span>}
+            {data.source && <span className="article-source">📚 Source: {data.source}</span>}
+          </div>
+          {isAdmin && onEdit && (
+            <button className="edit-add-btn" style={{ marginTop: 10 }} onClick={onEdit}>✏️ Edit article</button>
+          )}
+        </div>
+
+        <div className="modal-body article-body">
+          <div className="article-controls">
+            <div className="article-lang-toggle">
+              <button className={`filter-btn ${lang === "en" ? "active" : ""}`} onClick={() => switchLang("en")}>🇬🇧 English</button>
+              <button className={`filter-btn ${lang === "th" ? "active" : ""}`} onClick={() => switchLang("th")}>🇹🇭 ภาษาไทย</button>
+            </div>
+            <div className="article-playback">
+              {!playing && <button className="article-play-btn" onClick={() => startPlayback(true)}>▶ {lang === "en" ? "Listen in English" : "ฟังภาษาไทย"}</button>}
+              {playing && !paused && <button className="article-play-btn" onClick={pausePlayback}>⏸ Pause</button>}
+              {playing && paused && <button className="article-play-btn" onClick={resumePlayback}>▶ Resume</button>}
+              {playing && <button className="article-ctrl-btn" onClick={restartPlayback} title="Restart">⟲</button>}
+              {playing && <button className="article-ctrl-btn" onClick={stopPlayback} title="Stop">⏹</button>}
+            </div>
+          </div>
+
+          <article className="article-passage">
+            {paragraphs.map((p, i) => (
+              <p key={i} className={`article-para ${activePara === i ? "reading" : ""}`}>
+                {lang === "en"
+                  ? renderAnnotatedParagraph(p, data.vocabulary ?? [], setSelectedVocab)
+                  : p}
+              </p>
+            ))}
+            {paragraphs.length === 0 && <p className="article-para" style={{ color: "var(--text-muted)" }}>No {lang === "en" ? "English" : "Thai"} content available.</p>}
+          </article>
+
+          {(data.vocabulary?.length ?? 0) > 0 && (
+            <div className="modal-section">
+              <div className="section-label"><span className="icon">🔑</span>CEFR Vocabulary</div>
+              <div className="keywords-grid">
+                {data.vocabulary.map((v, i) => {
+                  const wid = vocabId(v);
+                  const saved = savedWordIds?.has(wid);
+                  return (
+                    <div key={i} className="keyword-card" style={{ borderLeft: `3px solid ${CEFR_COLOR_MAP[v.cefr] ?? "var(--slate)"}` }}>
+                      <div className="keyword-header">
+                        <div className="keyword-word">{v.phrase} <button className="speak-btn" onClick={() => speakWord(v.pronunciation || v.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
+                        <div className="keyword-badges">
+                          <span className={`tag tag-cefr ${v.cefr}`}>{v.cefr}</span>
+                          <span className="tag tag-pos">{v.pos}</span>
+                          {onSaveWord && (
+                            <button className={`word-save-btn ${saved ? "saved" : ""}`}
+                              onClick={() => !saved && onSaveWord(wid, { word: v.headword || v.phrase, cefr: v.cefr, pos: v.pos, definitionEN: v.meaningEN, definitionTH: v.meaningTH, example: v.exampleEN })}
+                              title={saved ? "Already in deck" : "Save to flashcard deck"} aria-label={saved ? "Already in deck" : "Save to flashcard deck"}>
+                              {saved ? "✅" : "➕"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="keyword-def-en">🇬🇧 {v.meaningEN}</div>
+                      <div className="keyword-def-th">🇹🇭 {v.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(v.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
+                      {v.exampleEN && <div className="article-vocab-ex">“{v.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(v.exampleEN)} title="Listen">🔊</button></div>}
+                      {v.exampleTH && <div className="article-vocab-ex th">“{v.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(v.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {selectedVocab && (
+          <div className="vocab-popover-overlay" onClick={() => setSelectedVocab(null)}>
+            <div className="vocab-popover" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ borderTop: `3px solid ${CEFR_COLOR_MAP[selectedVocab.cefr] ?? "var(--slate)"}` }}>
+              <button className="modal-close" style={{ top: 10, right: 10, width: 30, height: 30 }} onClick={() => setSelectedVocab(null)} aria-label="Close">✕</button>
+              <div className="keyword-word" style={{ fontSize: 20 }}>{selectedVocab.phrase} <button className="speak-btn" onClick={() => speakWord(selectedVocab.pronunciation || selectedVocab.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
+              <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+                <span className={`tag tag-cefr ${selectedVocab.cefr}`}>{selectedVocab.cefr}</span>
+                <span className="tag tag-pos">{selectedVocab.pos}</span>
+              </div>
+              <div className="keyword-def-en">🇬🇧 {selectedVocab.meaningEN}</div>
+              <div className="keyword-def-th">🇹🇭 {selectedVocab.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(selectedVocab.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
+              {selectedVocab.exampleEN && <div className="article-vocab-ex">“{selectedVocab.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(selectedVocab.exampleEN)} title="Listen">🔊</button></div>}
+              {selectedVocab.exampleTH && <div className="article-vocab-ex th">“{selectedVocab.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(selectedVocab.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
+              {onSaveWord && (() => {
+                const wid = vocabId(selectedVocab); const saved = savedWordIds?.has(wid);
+                return <button className="admin-login-btn" style={{ marginTop: 12 }} disabled={saved}
+                  onClick={() => { if (!saved) onSaveWord(wid, { word: selectedVocab.headword || selectedVocab.phrase, cefr: selectedVocab.cefr, pos: selectedVocab.pos, definitionEN: selectedVocab.meaningEN, definitionTH: selectedVocab.meaningTH, example: selectedVocab.exampleEN }); }}>
+                  {saved ? "✅ In your deck" : "➕ Add to flashcards"}
+                </button>;
+              })()}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1193,6 +1876,8 @@ export default function Home() {
   const [panelInitialTab, setPanelInitialTab] = useState<"login"|"register">("login");
   const [adminToken, setAdminToken] = useState("");
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [creatingArticle, setCreatingArticle] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [userSession, setUserSession] = useState<{ id: string; email: string; displayName: string; role: "admin"|"user" } | null>(null);
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
   const [savedWords, setSavedWords] = useState<Array<{ id: string; data: Record<string, unknown> }>>([]);
@@ -1230,6 +1915,13 @@ export default function Home() {
   // Filter & sort
   useEffect(() => {
     let result = [...videos];
+    // Hide draft articles from non-admin viewers
+    if (!adminToken) {
+      result = result.filter(v => {
+        const data = getIdiomData(v);
+        return !(data && (data as unknown as Record<string, unknown>).draft === true);
+      });
+    }
     // Category filter
     if (category !== "all") {
       result = result.filter(v => {
@@ -1259,7 +1951,7 @@ export default function Home() {
       case "cefr": { const o: Record<string, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 }; result.sort((a, b) => (o[getIdiomData(a)?.cefr ?? "B1"] ?? 3) - (o[getIdiomData(b)?.cefr ?? "B1"] ?? 3)); break; }
     }
     setFiltered(result);
-  }, [videos, search, sort, cefrFilter, category]);
+  }, [videos, search, sort, cefrFilter, category, adminToken]);
 
   // Compute EP numbers: for each category, sort by date (oldest=1) and assign numbers
   useEffect(() => {
@@ -1296,6 +1988,7 @@ export default function Home() {
             <button className={`top-nav-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idiom of the Day</button>
             <button className={`top-nav-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
             <button className={`top-nav-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiration</button>
+            <button className={`top-nav-tab ${category === "articles" ? "active" : ""}`} onClick={() => setCategory("articles")}>Articles</button>
           </div>
           <div className="top-nav-actions">
             {!userSession && (
@@ -1381,17 +2074,33 @@ export default function Home() {
       {/* Main */}
       <main className="main-content">
         {/* Admin toolbar */}
-        {adminToken && (
+        {adminToken && category === "articles" && (
+          <div className="admin-toolbar">
+            <div className="admin-toolbar-left">
+              <h2 className="admin-toolbar-title">Article Management</h2>
+              <span className="admin-toolbar-count">{filtered.length} articles</span>
+            </div>
+            <div className="admin-toolbar-right">
+              <button className="admin-toolbar-btn secondary" onClick={() => {
+                navigator.clipboard.writeText(ARTICLE_AI_PROMPT).then(() => showToast("AI prompt copied!", "success")).catch(() => showToast("Copy failed", "error"));
+              }}>📋 Copy AI JSON prompt</button>
+              <button className="admin-toolbar-btn secondary" onClick={() => setImportOpen(true)}>📥 Import article JSON</button>
+              <button className="admin-toolbar-btn" onClick={() => setCreatingArticle(true)}>➕ Add article</button>
+            </div>
+          </div>
+        )}
+        {adminToken && category !== "articles" && (
           <div className="admin-toolbar">
             <div className="admin-toolbar-left">
               <h2 className="admin-toolbar-title">Content Management</h2>
               <span className="admin-toolbar-count">{videos.length} episodes</span>
             </div>
             <div className="admin-toolbar-right">
-              <select className="admin-toolbar-select" value={addCategory} onChange={(e) => setAddCategory(e.target.value as "idiom"|"howtosay"|"motto")}>
+              <select className="admin-toolbar-select" value={addCategory} onChange={(e) => setAddCategory(e.target.value)}>
                 <option value="idiom">Idiom</option>
                 <option value="howtosay">How to Say</option>
                 <option value="motto">Inspiring</option>
+                <option value="articles">Article</option>
               </select>
               <button className="admin-toolbar-btn" onClick={() => { setAdminOpen(true); }}>➕ Add content</button>
             </div>
@@ -1414,12 +2123,12 @@ export default function Home() {
             <div className="error-state"><span style={{ fontSize: 48 }}>⚠️</span><h3>ไม่สามารถโหลดข้อมูลได้</h3><p>{error}</p><button className="retry-btn" onClick={() => fetchVideos()}>ลองอีกครั้ง</button></div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "ไม่พบ Idiom ที่ค้นหา" : "ยังไม่มี Idiom"}</h3><p>{search ? "ลองค้นหาด้วยคำอื่น" : "Sign in (☰) แล้วเพิ่ม Idiom ใหม่"}</p></div>
+            <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "No results found" : category === "articles" ? "No articles yet" : "No content yet"}</h3><p>{search ? "Try a different search term or filter" : "Sign in (☰) to add new content"}</p></div>
           )}
           {!loading && !error && filtered.map((video, i) => {
             const d = getIdiomData(video);
             const cat = d ? (d as unknown as Record<string, string>).category || "idiom" : "idiom";
-            const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Inspiring" : cat;
+            const catLabel = cat === "idiom" ? "Idiom of the Day" : cat === "howtosay" ? "How to Say" : cat === "motto" ? "Inspiring" : cat === "articles" ? "Article" : cat;
             return (
             <VideoCard key={video.id} video={video} index={i}
               onClick={() => setSelectedVideo({ video, index: i })}
@@ -1465,18 +2174,38 @@ export default function Home() {
       </footer>
 
       <button id="backToTop" className={showTop ? "visible" : ""} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="กลับขึ้นด้านบน">↑</button>
-      {selectedVideo && <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
-        userSession={userSession}
-        savedWordIds={new Set(savedWords.map(w => w.id))}
-        onSaveWord={userSession ? async (wordId, wordData) => {
-          try {
-            await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
-            setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
-            showToast(`📝 "${(wordData as {word?:string}).word}" saved to deck!`, "success");
-          } catch { /* ignore */ }
-        } : undefined}
-      />}
-      {editingVideo && <EditModal video={editingVideo} token={adminToken} onClose={() => setEditingVideo(null)} onSaved={() => fetchVideos(true)} onToast={showToast} />}
+      {selectedVideo && (isArticleData(getIdiomData(selectedVideo.video)) ? (
+        <ArticleModal video={selectedVideo.video} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
+          isAdmin={!!adminToken}
+          onEdit={() => { const v = selectedVideo.video; setSelectedVideo(null); setEditingVideo(v); }}
+          savedWordIds={new Set(savedWords.map(w => w.id))}
+          onSaveWord={userSession ? async (wordId, wordData) => {
+            try {
+              await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
+              setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
+              showToast(`📝 "${(wordData as {word?:string}).word}" saved to deck!`, "success");
+            } catch { /* ignore */ }
+          } : undefined}
+        />
+      ) : (
+        <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}
+          userSession={userSession}
+          savedWordIds={new Set(savedWords.map(w => w.id))}
+          onSaveWord={userSession ? async (wordId, wordData) => {
+            try {
+              await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
+              setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
+              showToast(`📝 "${(wordData as {word?:string}).word}" saved to deck!`, "success");
+            } catch { /* ignore */ }
+          } : undefined}
+        />
+      ))}
+      {editingVideo && (isArticleData(getIdiomData(editingVideo))
+        ? <ArticleEditModal video={editingVideo} token={adminToken} onClose={() => setEditingVideo(null)} onSaved={() => fetchVideos(true)} onToast={showToast} />
+        : <EditModal video={editingVideo} token={adminToken} onClose={() => setEditingVideo(null)} onSaved={() => fetchVideos(true)} onToast={showToast} />
+      )}
+      {creatingArticle && <ArticleEditModal video={null} token={adminToken} onClose={() => setCreatingArticle(false)} onSaved={() => fetchVideos(true)} onToast={showToast} />}
+      {importOpen && <ArticleImportModal token={adminToken} existingIds={new Set(videos.map(v => v.tiktok_id))} onClose={() => setImportOpen(false)} onSaved={() => fetchVideos(true)} onToast={showToast} />}
       <Toast msg={toast.msg} type={toast.type} />
     </>
   );

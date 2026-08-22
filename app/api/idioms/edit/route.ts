@@ -24,13 +24,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "tiktokId and data are required." }, { status: 400 });
   }
 
-  const idiomData = body.data as { idiom?: string; definitionEN?: string; date?: string; thumbnail?: string };
+  const idiomData = body.data as { idiom?: string; definitionEN?: string; date?: string; thumbnail?: string; category?: string; isArticle?: boolean };
   if (!idiomData.idiom || !idiomData.definitionEN) {
     return NextResponse.json({ error: "data must have at least idiom and definitionEN." }, { status: 400 });
   }
 
+  const isArticle = idiomData.isArticle === true || idiomData.category === "articles";
   const updateFields: Record<string, unknown> = {
-    title: `Idiom of the Day: ${idiomData.idiom}`,
+    title: isArticle ? `Article: ${idiomData.idiom}` : `Idiom of the Day: ${idiomData.idiom}`,
     caption: `${idiomData.thumbnail ?? "📚"} ${idiomData.idiom} — ${idiomData.definitionEN}`,
     summary: JSON.stringify(body.data),
     summary_source: "manual",

@@ -63,31 +63,45 @@ export async function POST(req: NextRequest) {
   }
 
   // Parse body
-  let body: IdiomData;
+  let body: IdiomData & { category?: string; isArticle?: boolean; articleCategory?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  // Validate required fields
-  if (!body.idiom || !body.definitionEN || !body.definitionTH) {
+  const isArticle = body.isArticle === true || body.category === "articles";
+
+  // Validate required fields. Articles require idiom + English summary;
+  // Thai summary is optional for articles (full Thai body lives in bodyTH).
+  if (!body.idiom || !body.definitionEN) {
     return NextResponse.json(
-      { error: "Missing required fields: idiom, definitionEN, definitionTH" },
+      { error: "Missing required fields: idiom, definitionEN" },
+      { status: 400 }
+    );
+  }
+  if (!isArticle && !body.definitionTH) {
+    return NextResponse.json(
+      { error: "Missing required field: definitionTH" },
       { status: 400 }
     );
   }
 
-  // Generate a stable tiktok_id from the idiom name if not linked to a real video
-  const idiomSlug = body.idiom.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  // Generate a stable tiktok_id from the idiom/title name if not linked to a real video
+  const idiomSlug = body.idiom.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60);
+  const prefix = isArticle ? "article" : "idiom";
   const tiktokId = body.tiktokUrl
-    ? extractVideoId(body.tiktokUrl) ?? `idiom_${idiomSlug}`
-    : `idiom_${idiomSlug}`;
+    ? extractVideoId(body.tiktokUrl) ?? `${prefix}_${idiomSlug}`
+    : `${prefix}_${idiomSlug}`;
+
+  const title = isArticle
+    ? `Article: ${body.idiom}`
+    : `Idiom of the Day: ${body.idiom}`;
 
   // Build the row
   const row = {
     tiktok_id: tiktokId,
-    title: `Idiom of the Day: ${body.idiom}`,
+    title,
     caption: `${body.thumbnail ?? "📚"} ${body.idiom} — ${body.definitionEN}`,
     cover_image_url: "",
     share_url: body.tiktokUrl ?? "https://www.tiktok.com/@patternspeakout",
