@@ -2999,6 +2999,16 @@ select.edit-input { cursor: pointer; }
 .vocab-annot:focus-visible .vocab-annot-word {
   box-shadow: 0 0 0 2px var(--vc-color, var(--slate));
 }
+/* Saved-to-deck state: a small check marker so the user sees it was added */
+.vocab-annot.saved { cursor: default; }
+.vocab-annot.saved .vocab-annot-word {
+  background: color-mix(in srgb, var(--vc-color, var(--slate)) 16%, transparent);
+}
+.vocab-annot.saved .vocab-annot-word::after {
+  content: " ✓";
+  font-size: 0.85em;
+  color: var(--vc-color, var(--slate));
+}
 /* The label is absolutely positioned so it is removed from layout flow and
    cannot stretch/scatter the line. It sits in the reserved space above. */
 .vocab-annot-label {

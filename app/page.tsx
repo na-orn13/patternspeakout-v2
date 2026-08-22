@@ -225,6 +225,13 @@ function isArticleData(d: IdiomData | null): d is ArticleData {
   return !!d && (d as ArticleData).isArticle === true;
 }
 
+// Short meaning = the part before the first dash separator (— / – / -) or colon.
+function shortMeaning(meaning: string): string {
+  if (!meaning) return "";
+  const idx = meaning.search(/\s[—–:-]\s/);
+  return (idx === -1 ? meaning : meaning.slice(0, idx)).trim();
+}
+
 const CEFR_COLOR_MAP: Record<string, string> = { A1: "#27ae60", A2: "#2ecc71", B1: "#3498db", B2: "#a855f7", C1: "#e67e22", C2: "#e74c3c" };
 const VALID_CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const ARTICLE_CATEGORIES = ["Technology & Society", "Grammar", "Vocabulary", "Pronunciation", "Culture", "Learning Tips", "Business", "Science", "Health", "Environment"];
@@ -1095,7 +1102,8 @@ function ArticleImportModal({ token, existingIds, onClose, onSaved, onToast }: {
 function renderAnnotatedParagraph(
   paragraph: string,
   vocab: ArticleVocab[],
-  onOpenVocab: (v: ArticleVocab, rect: DOMRect) => void
+  onAddWord: (v: ArticleVocab) => void,
+  isSaved: (v: ArticleVocab) => boolean
 ) {
   if (!vocab.length) return <>{paragraph}</>;
   const phrases = [...vocab].sort((a, b) => b.phrase.length - a.phrase.length);
@@ -1114,17 +1122,18 @@ function renderAnnotatedParagraph(
     if (matchIdx > 0) nodes.push(<span key={key++}>{remaining.slice(0, matchIdx)}</span>);
     const actual = remaining.slice(matchIdx, matchIdx + matched.phrase.length);
     const v = matched;
-    const openFromEl = (el: HTMLElement) => onOpenVocab(v, el.getBoundingClientRect());
+    const saved = isSaved(v);
     // The short meaning label above the word is absolutely positioned so it is
     // removed from the text flow and never stretches the line / scatters words.
+    // Clicking the word adds it directly to the deck (no popup, no toast).
     nodes.push(
-      <span key={key++} className="vocab-annot" tabIndex={0} role="button"
+      <span key={key++} className={`vocab-annot ${saved ? "saved" : ""}`} tabIndex={0} role="button"
         style={{ ["--vc-color" as string]: CEFR_COLOR_MAP[v.cefr] ?? "var(--slate)" }}
-        aria-label={`${v.phrase}, CEFR ${v.cefr}. ${v.meaningEN}. Open details`}
-        onClick={(e) => { e.stopPropagation(); openFromEl(e.currentTarget); }}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromEl(e.currentTarget); } }}
+        aria-label={`${v.phrase}, CEFR ${v.cefr}. ${shortMeaning(v.meaningTH || v.meaningEN)}. ${saved ? "Saved to deck" : "Click to add to deck"}`}
+        onClick={(e) => { e.stopPropagation(); if (!saved) onAddWord(v); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!saved) onAddWord(v); } }}
       >
-        <span className="vocab-annot-label" aria-hidden="true">{v.meaningTH || v.meaningEN}</span>
+        <span className="vocab-annot-label" aria-hidden="true">{shortMeaning(v.meaningTH || v.meaningEN)}</span>
         <span className="vocab-annot-word">{actual}</span>
       </span>
     );
@@ -1146,8 +1155,6 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
   const [paused, setPaused] = useState(false);
   const [activePara, setActivePara] = useState(-1);
   const [wordRange, setWordRange] = useState<{ start: number; end: number } | null>(null);
-  const [selectedVocab, setSelectedVocab] = useState<{ v: ArticleVocab; rect: DOMRect } | null>(null);
-  const openVocab = (v: ArticleVocab, rect: DOMRect) => setSelectedVocab({ v, rect });
   const stoppedRef = useRef(false);
 
   useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
@@ -1205,6 +1212,12 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
   if (!data) return null;
 
   const vocabId = (v: ArticleVocab) => `word_${(v.headword || v.phrase).toLowerCase().replace(/\s+/g, "_")}`;
+  const isVocabSaved = (v: ArticleVocab) => !!savedWordIds?.has(vocabId(v));
+  const addVocabWord = (v: ArticleVocab) => {
+    if (!onSaveWord) return;
+    if (isVocabSaved(v)) return;
+    onSaveWord(vocabId(v), { word: v.headword || v.phrase, cefr: v.cefr, pos: v.pos, definitionEN: v.meaningEN, definitionTH: v.meaningTH, example: v.exampleEN });
+  };
 
   return (
     <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) { stopPlayback(); onClose(); } }} role="dialog" aria-modal="true">
@@ -1258,7 +1271,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
                 const e = Math.max(s, Math.min(end, p.length));
                 content = <>{p.slice(0, s)}<mark className="reading-word">{p.slice(s, e)}</mark>{p.slice(e)}</>;
               } else if (lang === "en") {
-                content = renderAnnotatedParagraph(p, data.vocabulary ?? [], openVocab);
+                content = renderAnnotatedParagraph(p, data.vocabulary ?? [], addVocabWord, isVocabSaved);
               } else {
                 content = p;
               }
@@ -1303,34 +1316,6 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
             </div>
           )}
         </div>
-
-        {selectedVocab && (() => {
-          const sv = selectedVocab.v;
-          return (
-            <div className="vocab-popover-overlay centered" onClick={() => setSelectedVocab(null)}>
-              <div className="vocab-popover" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
-                style={{ borderTop: `3px solid ${CEFR_COLOR_MAP[sv.cefr] ?? "var(--slate)"}` }}>
-                <button className="modal-close" style={{ top: 10, right: 10, width: 30, height: 30 }} onClick={() => setSelectedVocab(null)} aria-label="Close">✕</button>
-                <div className="keyword-word" style={{ fontSize: 20 }}>{sv.phrase} <button className="speak-btn" onClick={() => speakWord(sv.pronunciation || sv.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
-                <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
-                  <span className={`tag tag-cefr ${sv.cefr}`}>{sv.cefr}</span>
-                  <span className="tag tag-pos">{sv.pos}</span>
-                </div>
-                <div className="keyword-def-en">🇬🇧 {sv.meaningEN}</div>
-                <div className="keyword-def-th">🇹🇭 {sv.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(sv.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
-                {sv.exampleEN && <div className="article-vocab-ex">“{highlightWordInSentence(sv.exampleEN, sv)}” <button className="speak-btn-sm" onClick={() => speakWord(sv.exampleEN)} title="Listen">🔊</button></div>}
-                {sv.exampleTH && <div className="article-vocab-ex th">“{sv.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(sv.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
-                {onSaveWord && (() => {
-                  const wid = vocabId(sv); const saved = savedWordIds?.has(wid);
-                  return <button className="admin-login-btn" style={{ marginTop: 12 }} disabled={saved}
-                    onClick={() => { if (!saved) onSaveWord(wid, { word: sv.headword || sv.phrase, cefr: sv.cefr, pos: sv.pos, definitionEN: sv.meaningEN, definitionTH: sv.meaningTH, example: sv.exampleEN }); }}>
-                    {saved ? "✅ In your deck" : "➕ Add to flashcards"}
-                  </button>;
-                })()}
-              </div>
-            </div>
-          );
-        })()}
       </div>
     </div>
   );
@@ -2313,7 +2298,7 @@ export default function Home() {
             try {
               await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
               setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
-              showToast(`📝 "${(wordData as {word?:string}).word}" saved to deck!`, "success");
+              // No toast — silent add per design.
             } catch { /* ignore */ }
           } : undefined}
         />
