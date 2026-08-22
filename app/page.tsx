@@ -236,6 +236,17 @@ const CEFR_COLOR_MAP: Record<string, string> = { A1: "#27ae60", A2: "#2ecc71", B
 const VALID_CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const ARTICLE_CATEGORIES = ["Technology & Society", "Grammar", "Vocabulary", "Pronunciation", "Culture", "Learning Tips", "Business", "Science", "Health", "Environment"];
 
+// Category navigation — the `id` maps to the existing filter values used by
+// setCategory() (all / idiom / howtosay / motto / articles), so all existing
+// filtering behavior is preserved.
+const CATEGORY_NAV: Array<{ id: string; label: string }> = [
+  { id: "all", label: "Latest" },
+  { id: "idiom", label: "Idioms" },
+  { id: "howtosay", label: "How to Say" },
+  { id: "motto", label: "Inspiration" },
+  { id: "articles", label: "Articles" },
+];
+
 // The EXACT JSON schema this website imports for an article (stored in videos.summary).
 const ARTICLE_SCHEMA_JSON = `{
   "isArticle": true,
@@ -1515,6 +1526,8 @@ function DetailModal({ video, index, epNumber, onClose, onShare, userSession, sa
 }
 
 // ─── Side Panel (Login/Register/Admin/Deck) ──────────────────────────────────
+type PanelTab = "login" | "register" | "admin" | "deck" | "users" | "stats" | "settings";
+
 interface SidePanelProps {
   open: boolean; onClose: () => void;
   onToast: (msg: string, type: "success"|"error") => void;
@@ -1529,13 +1542,24 @@ interface SidePanelProps {
   onToggleFav: (tiktokId: string) => void;
   onRemoveWord: (wordId: string) => void;
   addCategory: string;
-  initialTab?: "login"|"register";
+  initialTab?: PanelTab;
 }
 
 function SidePanel({ open, onClose, onToast, onRefresh, onAuth, onUpdateName, userSession, adminToken, videos, favourites, savedWords, onToggleFav, onRemoveWord, addCategory, initialTab }: SidePanelProps) {
-  const [tab, setTab] = useState<"login"|"register"|"admin"|"deck"|"users"|"stats"|"settings">("login");
-  // Sync tab from parent when header buttons trigger open
-  useEffect(() => { if (initialTab && !userSession) setTab(initialTab); }, [initialTab, open, userSession]);
+  const [tab, setTab] = useState<PanelTab>("login");
+  // Sync tab from parent when header/drawer buttons trigger open.
+  // Guest-only tabs (login/register) apply only when signed out; account tabs
+  // (settings/deck/admin/users) apply only when the session permits them.
+  useEffect(() => {
+    if (!initialTab || !open) return;
+    if (!userSession) {
+      if (initialTab === "login" || initialTab === "register") setTab(initialTab);
+    } else if (userSession.role === "admin") {
+      setTab(initialTab);
+    } else if (initialTab === "deck" || initialTab === "settings") {
+      setTab(initialTab);
+    }
+  }, [initialTab, open, userSession]);
   // Login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -1974,6 +1998,160 @@ ${sampleJson}`;
   );
 }
 
+// ─── Navigation Drawer (left) ─────────────────────────────────────────────────
+interface NavDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  category: string;
+  onSelectCategory: (id: string) => void;
+  search: string;
+  onSearchChange: (v: string) => void;
+  userSession: { id: string; email: string; displayName: string; role: "admin"|"user" } | null;
+  adminToken: string;
+  // Open the existing SidePanel to a specific tab (reuses all existing handlers)
+  onOpenPanel: (tab: PanelTab) => void;
+  onSignOut: () => void;
+  restoreFocusRef: React.RefObject<HTMLButtonElement | null>;
+}
+
+function NavDrawer({ open, onClose, category, onSelectCategory, search, onSearchChange, userSession, adminToken, onOpenPanel, onSignOut, restoreFocusRef }: NavDrawerProps) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const isAdmin = !!adminToken || userSession?.role === "admin";
+
+  // Lock background scroll while open
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  // Focus the close button on open; restore focus to the hamburger on close
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => closeBtnRef.current?.focus(), 60);
+      return () => clearTimeout(t);
+    } else {
+      restoreFocusRef.current?.focus();
+    }
+  }, [open, restoreFocusRef]);
+
+  // Escape to close + focus trap (Tab / Shift+Tab wrap within the drawer)
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
+      if (e.key !== "Tab") return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const goCategory = (id: string) => { onSelectCategory(id); onClose(); };
+  const openPanelAndClose = (tab: PanelTab) => { onOpenPanel(tab); onClose(); };
+
+  return (
+    <>
+      <div className={`nav-drawer-overlay ${open ? "open" : ""}`} onClick={onClose} aria-hidden="true" />
+      <div
+        id="nav-drawer"
+        ref={drawerRef}
+        className={`nav-drawer ${open ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site navigation"
+        aria-hidden={!open}
+      >
+        <div className="nav-drawer-top">
+          <button ref={closeBtnRef} className="nav-drawer-close" onClick={onClose} aria-label="Close menu">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+
+        {/* Search field */}
+        <form
+          className="nav-drawer-search"
+          role="search"
+          onSubmit={(e) => { e.preventDefault(); onClose(); const el = document.getElementById("searchInput"); el?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+        >
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search idioms, phrases and more"
+            aria-label="Search"
+            autoComplete="off"
+          />
+          <button type="submit" className="nav-drawer-search-btn" aria-label="Search">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
+        </form>
+
+        <nav className="nav-drawer-list" aria-label="Main destinations">
+          {/* Main category destinations */}
+          {CATEGORY_NAV.map(c => (
+            <button
+              key={c.id}
+              className={`nav-drawer-row ${category === c.id ? "active" : ""}`}
+              onClick={() => goCategory(c.id)}
+              aria-current={category === c.id ? "page" : undefined}
+            >
+              <span>{c.label}</span>
+            </button>
+          ))}
+
+          {/* Favorites + Flashcards */}
+          {userSession ? (
+            <button className="nav-drawer-row" onClick={() => openPanelAndClose("deck")}>
+              <span>Favorites</span>
+            </button>
+          ) : (
+            <button className="nav-drawer-row" onClick={() => openPanelAndClose("login")}>
+              <span>Favorites</span>
+            </button>
+          )}
+          <a className="nav-drawer-row" href="/deck" onClick={onClose}>
+            <span>Flashcards</span>
+          </a>
+
+          {/* Authenticated section */}
+          {userSession && (
+            <div className="nav-drawer-section">
+              <div className="nav-drawer-section-title">Account</div>
+              <a className="nav-drawer-row" href="/deck" onClick={onClose}><span>My Deck</span></a>
+              <button className="nav-drawer-row" onClick={() => openPanelAndClose("settings")}><span>Settings</span></button>
+              <button className="nav-drawer-row" onClick={() => openPanelAndClose("settings")}><span>Change name</span></button>
+              <button className="nav-drawer-row" onClick={() => openPanelAndClose("settings")}><span>Change password</span></button>
+              <button className="nav-drawer-row" onClick={() => { onSignOut(); onClose(); }}><span>Sign out</span></button>
+            </div>
+          )}
+
+          {/* Admin-only section */}
+          {isAdmin && (
+            <div className="nav-drawer-section">
+              <div className="nav-drawer-section-title">Admin</div>
+              <button className="nav-drawer-row" onClick={() => openPanelAndClose("admin")}><span>Admin panel</span></button>
+              <button className="nav-drawer-row" onClick={() => openPanelAndClose("admin")}><span>Add content</span></button>
+              <button className="nav-drawer-row" onClick={() => { onSelectCategory("articles"); onClose(); }}><span>Article management</span></button>
+              <a className="nav-drawer-row" href="/stats" onClick={onClose}><span>Statistics</span></a>
+            </div>
+          )}
+        </nav>
+      </div>
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -1990,7 +2168,10 @@ export default function Home() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" }>({ msg: "", type: "" });
   const [epMap, setEpMap] = useState<Map<string, number>>(new Map());
   const [adminOpen, setAdminOpen] = useState(false);
-  const [panelInitialTab, setPanelInitialTab] = useState<"login"|"register">("login");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const categoryRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [panelInitialTab, setPanelInitialTab] = useState<PanelTab>("login");
   const [adminToken, setAdminToken] = useState("");
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [creatingArticle, setCreatingArticle] = useState(false);
@@ -2152,34 +2333,81 @@ export default function Home() {
   const [showTop, setShowTop] = useState(false);
   useEffect(() => { const h = () => setShowTop(window.scrollY > 400); window.addEventListener("scroll", h, { passive: true }); return () => window.removeEventListener("scroll", h); }, []);
 
+  // Scroll the active category tab into view (matters on mobile where the
+  // category row is horizontally scrollable).
+  useEffect(() => {
+    const el = categoryRefs.current[category];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [category]);
+
+  // Sign out — reuses the same reset path the SidePanel logout triggers.
+  const handleSignOut = useCallback(() => {
+    if (!confirm("Do you want to log out?")) return;
+    setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]);
+    sessionStorage.removeItem("deck_userId");
+  }, []);
+
   return (
     <>
-      {/* TOP NAVIGATION BAR */}
-      <nav className="top-nav" aria-label="Main navigation">
-        <div className="top-nav-inner">
-          <a href="/" className="top-nav-logo">Pattern<span>SpeakOut</span></a>
-          <div className="top-nav-tabs">
-            <button className={`top-nav-tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>All</button>
-            <button className={`top-nav-tab ${category === "idiom" ? "active" : ""}`} onClick={() => setCategory("idiom")}>Idiom of the Day</button>
-            <button className={`top-nav-tab ${category === "howtosay" ? "active" : ""}`} onClick={() => setCategory("howtosay")}>How to Say</button>
-            <button className={`top-nav-tab ${category === "motto" ? "active" : ""}`} onClick={() => setCategory("motto")}>Inspiration</button>
-            <button className={`top-nav-tab ${category === "articles" ? "active" : ""}`} onClick={() => setCategory("articles")}>Articles</button>
-          </div>
-          <div className="top-nav-actions">
-            {!userSession && (
-              <>
-                <button className="header-auth-btn secondary" onClick={() => { setPanelInitialTab("login"); setAdminOpen(true); }}>Sign in</button>
-                <button className="header-auth-btn primary" onClick={() => { setPanelInitialTab("register"); setAdminOpen(true); }}>Register</button>
-              </>
-            )}
-            {userSession && <a href="/deck" className="deck-page-btn" style={{ marginRight: 4 }}>🃏 My Deck</a>}
-            {adminToken && <a href="/stats" className="deck-page-btn" style={{ background: "rgba(155,89,182,0.08)", borderColor: "rgba(155,89,182,0.25)", color: "#a855f7", marginRight: 4 }}>📊 Stats</a>}
-            <button className={`hamburger-btn ${adminOpen ? "active" : ""}`} onClick={() => setAdminOpen(v => !v)} aria-label={adminOpen ? "Close panel" : "Open panel"} aria-expanded={adminOpen}>
-              <span className="hamburger-line" /><span className="hamburger-line" /><span className="hamburger-line" />
+      {/* TOP NAVIGATION BAR — two-row editorial header */}
+      <header className="site-header" aria-label="Site header">
+        {/* Row 1: controls left · centered logo · account right */}
+        <div className="site-header-row1">
+          <div className="site-header-left">
+            <button
+              ref={hamburgerRef}
+              className="icon-btn hamburger-btn"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open menu"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+              aria-controls="nav-drawer"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => { const el = document.getElementById("searchInput"); el?.focus(); el?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+              aria-label="Search"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             </button>
           </div>
+
+          <a href="/" className="site-header-logo">Pattern<span>SpeakOut</span></a>
+
+          <div className="site-header-right">
+            {!userSession ? (
+              <>
+                <button className="header-auth-btn primary" onClick={() => { setPanelInitialTab("register"); setAdminOpen(true); }}>Register</button>
+                <button className="header-auth-btn secondary" onClick={() => { setPanelInitialTab("login"); setAdminOpen(true); }}>Sign in</button>
+              </>
+            ) : (
+              <>
+                <a href="/deck" className="deck-page-btn">🃏 My Deck</a>
+                {adminToken && <a href="/stats" className="deck-page-btn stats" >📊 Stats</a>}
+              </>
+            )}
+          </div>
         </div>
-      </nav>
+
+        {/* Row 2: category navigation */}
+        <div className="site-header-row2">
+          <nav className="category-nav" aria-label="Categories">
+            {CATEGORY_NAV.map(c => (
+              <button
+                key={c.id}
+                ref={(el) => { categoryRefs.current[c.id] = el; }}
+                className={`category-nav-tab ${category === c.id ? "active" : ""}`}
+                onClick={() => setCategory(c.id)}
+                aria-current={category === c.id ? "page" : undefined}
+              >
+                {c.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
 
       {/* Hidden hero for particles (preserves JS) */}
       <div style={{ display: "none" }}><div ref={particlesRef} /></div>
@@ -2221,6 +2449,21 @@ export default function Home() {
           } catch { /* ignore */ }
         }}
         addCategory={addCategory}
+      />
+
+      {/* LEFT NAVIGATION DRAWER (hamburger) */}
+      <NavDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        category={category}
+        onSelectCategory={setCategory}
+        search={search}
+        onSearchChange={setSearch}
+        userSession={userSession}
+        adminToken={adminToken}
+        onOpenPanel={(tab) => { setPanelInitialTab(tab); setAdminOpen(true); }}
+        onSignOut={handleSignOut}
+        restoreFocusRef={hamburgerRef}
       />
 
       {/* Controls */}
