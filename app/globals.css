@@ -2955,18 +2955,19 @@ select.edit-input { cursor: pointer; }
 }
 .article-ctrl-btn:hover { border-color: var(--slate); background: var(--off-white); }
 
-/* Article passage */
+/* Article passage — generous, UNIFORM line spacing so the floating annotation
+   labels always fit in reserved space above each line and text never scatters. */
 .article-passage {
   font-size: 17px;
-  line-height: 1.9;
+  line-height: 2.4;
   color: var(--text-primary);
 }
 
 .article-para {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   border-radius: var(--radius);
   transition: background 0.2s ease;
-  padding: 4px 10px;
+  padding: 6px 10px;
 }
 
 .article-para.reading {
@@ -2974,44 +2975,54 @@ select.edit-input { cursor: pointer; }
   box-shadow: inset 3px 0 0 var(--slate);
 }
 
-/* Vocabulary ruby annotation (inline, underlined, meaning above) */
-ruby.vocab-annot {
-  ruby-position: over;
+/* Vocabulary annotation — short meaning floats ABOVE the underlined word
+   without affecting text flow (absolute label = no line scatter). The passage
+   reserves uniform space above every line so all lines stay evenly aligned. */
+.vocab-annot {
+  position: relative;
+  display: inline;
   cursor: pointer;
+  outline: none;
+}
+.vocab-annot-word {
   text-decoration: underline;
   text-decoration-color: var(--vc-color, var(--slate));
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
   border-radius: 3px;
-  outline: none;
   transition: background 0.15s ease;
 }
-ruby.vocab-annot:hover,
-ruby.vocab-annot:focus-visible {
-  background: color-mix(in srgb, var(--vc-color, var(--slate)) 12%, transparent);
+.vocab-annot:hover .vocab-annot-word,
+.vocab-annot:focus-visible .vocab-annot-word {
+  background: color-mix(in srgb, var(--vc-color, var(--slate)) 14%, transparent);
 }
-ruby.vocab-annot:focus-visible {
+.vocab-annot:focus-visible .vocab-annot-word {
   box-shadow: 0 0 0 2px var(--vc-color, var(--slate));
 }
-rt.vocab-annot-rt {
-  font-size: 0.62em;
+/* The label is absolutely positioned so it is removed from layout flow and
+   cannot stretch/scatter the line. It sits in the reserved space above. */
+.vocab-annot-label {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 1px;
+  font-size: 10.5px;
+  line-height: 1.1;
   font-weight: 600;
   color: var(--vc-color, var(--slate));
   font-family: 'Kanit', sans-serif;
-  padding-bottom: 2px;
+  white-space: nowrap;
+  pointer-events: none;
   user-select: none;
 }
 
-/* Vocab detail popover */
+/* Vocab detail popover — anchored near the clicked word (no page scroll jump) */
 .vocab-popover-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
   z-index: 1200;
-  padding: 20px;
 }
 .vocab-popover {
   background: var(--white);
@@ -3022,6 +3033,16 @@ rt.vocab-annot-rt {
   width: 100%;
   position: relative;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+/* Anchored variant floats at fixed viewport coordinates set inline */
+.vocab-popover.anchored {
+  position: fixed;
+  overflow-y: auto;
+  animation: vocabPopIn 0.14s ease;
+}
+@keyframes vocabPopIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .article-vocab-ex {
@@ -3063,5 +3084,6 @@ rt.vocab-annot-rt {
   .article-passage { font-size: 16px; line-height: 1.85; }
   .article-controls { flex-direction: column; align-items: stretch; }
   .article-lang-toggle, .article-playback { justify-content: center; }
-  rt.vocab-annot-rt { font-size: 0.58em; }
+  .vocab-annot-label { font-size: 9.5px; }
+  .vocab-popover.anchored { width: calc(100vw - 24px) !important; left: 12px !important; }
 }

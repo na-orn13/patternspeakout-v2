@@ -996,7 +996,7 @@ function ArticleImportModal({ token, existingIds, onClose, onSaved, onToast }: {
 function renderAnnotatedParagraph(
   paragraph: string,
   vocab: ArticleVocab[],
-  onOpenVocab: (v: ArticleVocab) => void
+  onOpenVocab: (v: ArticleVocab, rect: DOMRect) => void
 ) {
   if (!vocab.length) return <>{paragraph}</>;
   const phrases = [...vocab].sort((a, b) => b.phrase.length - a.phrase.length);
@@ -1015,16 +1015,19 @@ function renderAnnotatedParagraph(
     if (matchIdx > 0) nodes.push(<span key={key++}>{remaining.slice(0, matchIdx)}</span>);
     const actual = remaining.slice(matchIdx, matchIdx + matched.phrase.length);
     const v = matched;
+    const openFromEl = (el: HTMLElement) => onOpenVocab(v, el.getBoundingClientRect());
+    // The short meaning label above the word is absolutely positioned so it is
+    // removed from the text flow and never stretches the line / scatters words.
     nodes.push(
-      <ruby key={key++} className="vocab-annot" tabIndex={0} role="button"
+      <span key={key++} className="vocab-annot" tabIndex={0} role="button"
         style={{ ["--vc-color" as string]: CEFR_COLOR_MAP[v.cefr] ?? "var(--slate)" }}
         aria-label={`${v.phrase}, CEFR ${v.cefr}. ${v.meaningEN}. Open details`}
-        onClick={(e) => { e.stopPropagation(); onOpenVocab(v); }}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenVocab(v); } }}
+        onClick={(e) => { e.stopPropagation(); openFromEl(e.currentTarget); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromEl(e.currentTarget); } }}
       >
-        {actual}
-        <rt className="vocab-annot-rt">{v.meaningTH || v.meaningEN}</rt>
-      </ruby>
+        <span className="vocab-annot-label" aria-hidden="true">{v.meaningTH || v.meaningEN}</span>
+        <span className="vocab-annot-word">{actual}</span>
+      </span>
     );
     remaining = remaining.slice(matchIdx + matched.phrase.length);
   }
@@ -1043,7 +1046,8 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
   const [activePara, setActivePara] = useState(-1);
-  const [selectedVocab, setSelectedVocab] = useState<ArticleVocab | null>(null);
+  const [selectedVocab, setSelectedVocab] = useState<{ v: ArticleVocab; rect: DOMRect } | null>(null);
+  const openVocab = (v: ArticleVocab, rect: DOMRect) => setSelectedVocab({ v, rect });
   const stoppedRef = useRef(false);
 
   useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
@@ -1136,7 +1140,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
             {paragraphs.map((p, i) => (
               <p key={i} className={`article-para ${activePara === i ? "reading" : ""}`}>
                 {lang === "en"
-                  ? renderAnnotatedParagraph(p, data.vocabulary ?? [], setSelectedVocab)
+                  ? renderAnnotatedParagraph(p, data.vocabulary ?? [], openVocab)
                   : p}
               </p>
             ))}
@@ -1178,29 +1182,46 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
           )}
         </div>
 
-        {selectedVocab && (
-          <div className="vocab-popover-overlay" onClick={() => setSelectedVocab(null)}>
-            <div className="vocab-popover" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ borderTop: `3px solid ${CEFR_COLOR_MAP[selectedVocab.cefr] ?? "var(--slate)"}` }}>
-              <button className="modal-close" style={{ top: 10, right: 10, width: 30, height: 30 }} onClick={() => setSelectedVocab(null)} aria-label="Close">✕</button>
-              <div className="keyword-word" style={{ fontSize: 20 }}>{selectedVocab.phrase} <button className="speak-btn" onClick={() => speakWord(selectedVocab.pronunciation || selectedVocab.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
-              <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
-                <span className={`tag tag-cefr ${selectedVocab.cefr}`}>{selectedVocab.cefr}</span>
-                <span className="tag tag-pos">{selectedVocab.pos}</span>
+        {selectedVocab && (() => {
+          const sv = selectedVocab.v;
+          const r = selectedVocab.rect;
+          // Anchor the popover near the clicked word (viewport-fixed, no scroll jump).
+          const POP_W = 340;
+          const vw = typeof window !== "undefined" ? window.innerWidth : 800;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+          let left = r.left + r.width / 2 - POP_W / 2;
+          left = Math.max(12, Math.min(left, vw - POP_W - 12));
+          // Prefer below the word; flip above if not enough room.
+          const below = r.bottom + 10;
+          const showAbove = below > vh - 220;
+          const posStyle: React.CSSProperties = showAbove
+            ? { left, bottom: Math.max(12, vh - r.top + 10), maxHeight: r.top - 24 }
+            : { left, top: below, maxHeight: vh - below - 16 };
+          return (
+            <div className="vocab-popover-overlay" onClick={() => setSelectedVocab(null)}>
+              <div className="vocab-popover anchored" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
+                style={{ ...posStyle, width: POP_W, borderTop: `3px solid ${CEFR_COLOR_MAP[sv.cefr] ?? "var(--slate)"}` }}>
+                <button className="modal-close" style={{ top: 10, right: 10, width: 30, height: 30 }} onClick={() => setSelectedVocab(null)} aria-label="Close">✕</button>
+                <div className="keyword-word" style={{ fontSize: 20 }}>{sv.phrase} <button className="speak-btn" onClick={() => speakWord(sv.pronunciation || sv.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
+                <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+                  <span className={`tag tag-cefr ${sv.cefr}`}>{sv.cefr}</span>
+                  <span className="tag tag-pos">{sv.pos}</span>
+                </div>
+                <div className="keyword-def-en">🇬🇧 {sv.meaningEN}</div>
+                <div className="keyword-def-th">🇹🇭 {sv.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(sv.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
+                {sv.exampleEN && <div className="article-vocab-ex">“{sv.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(sv.exampleEN)} title="Listen">🔊</button></div>}
+                {sv.exampleTH && <div className="article-vocab-ex th">“{sv.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(sv.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
+                {onSaveWord && (() => {
+                  const wid = vocabId(sv); const saved = savedWordIds?.has(wid);
+                  return <button className="admin-login-btn" style={{ marginTop: 12 }} disabled={saved}
+                    onClick={() => { if (!saved) onSaveWord(wid, { word: sv.headword || sv.phrase, cefr: sv.cefr, pos: sv.pos, definitionEN: sv.meaningEN, definitionTH: sv.meaningTH, example: sv.exampleEN }); }}>
+                    {saved ? "✅ In your deck" : "➕ Add to flashcards"}
+                  </button>;
+                })()}
               </div>
-              <div className="keyword-def-en">🇬🇧 {selectedVocab.meaningEN}</div>
-              <div className="keyword-def-th">🇹🇭 {selectedVocab.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(selectedVocab.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
-              {selectedVocab.exampleEN && <div className="article-vocab-ex">“{selectedVocab.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(selectedVocab.exampleEN)} title="Listen">🔊</button></div>}
-              {selectedVocab.exampleTH && <div className="article-vocab-ex th">“{selectedVocab.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(selectedVocab.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
-              {onSaveWord && (() => {
-                const wid = vocabId(selectedVocab); const saved = savedWordIds?.has(wid);
-                return <button className="admin-login-btn" style={{ marginTop: 12 }} disabled={saved}
-                  onClick={() => { if (!saved) onSaveWord(wid, { word: selectedVocab.headword || selectedVocab.phrase, cefr: selectedVocab.cefr, pos: selectedVocab.pos, definitionEN: selectedVocab.meaningEN, definitionTH: selectedVocab.meaningTH, example: selectedVocab.exampleEN }); }}>
-                  {saved ? "✅ In your deck" : "➕ Add to flashcards"}
-                </button>;
-              })()}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
