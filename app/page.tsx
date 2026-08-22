@@ -207,6 +207,7 @@ interface ArticleVocab {
   exampleEN: string;
   exampleTH: string;
   pronunciation?: string; // if different from displayed form
+  forms?: string[];       // optional: extra word forms to highlight (irregulars)
 }
 
 interface ArticleData extends IdiomData {
@@ -253,9 +254,10 @@ const ARTICLE_SCHEMA_JSON = `{
       "pos": "<part of speech>",
       "meaningEN": "<concise English meaning>",
       "meaningTH": "<natural Thai meaning>",
-      "exampleEN": "<English example sentence>",
+      "exampleEN": "<English example sentence — should contain the word, any form>",
       "exampleTH": "<Thai translation of the example>",
-      "pronunciation": "<optional: pronunciation text if different from phrase>"
+      "pronunciation": "<optional: pronunciation text if different from phrase>",
+      "forms": ["<optional: extra inflected/irregular forms to highlight, e.g. went, gone>"]
     }
   ],
   "synonyms": [],
@@ -290,6 +292,95 @@ ${ARTICLE_SCHEMA_JSON}`;
 function containsUnsafeHtml(s: string): boolean {
   return /<\s*(script|iframe|object|embed|style|link|meta)\b/i.test(s) ||
     /\bon\w+\s*=/i.test(s) || /javascript:/i.test(s);
+}
+
+// ─── Word-form matching (for highlighting a vocab word in example sentences,
+// even when it appears as an inflected or irregular form) ──────────────────────
+// Common irregular verbs: base -> [past, past participle, and other forms].
+const IRREGULAR_VERBS: Record<string, string[]> = {
+  be: ["am","is","are","was","were","been","being"], become: ["became","become","becoming"],
+  begin: ["began","begun","beginning"], break: ["broke","broken","breaking"], bring: ["brought","bringing"],
+  build: ["built","building"], buy: ["bought","buying"], catch: ["caught","catching"], choose: ["chose","chosen","choosing"],
+  come: ["came","come","coming"], cost: ["cost","costing"], cut: ["cut","cutting"], do: ["does","did","done","doing"],
+  draw: ["drew","drawn","drawing"], drink: ["drank","drunk","drinking"], drive: ["drove","driven","driving"],
+  eat: ["ate","eaten","eating"], fall: ["fell","fallen","falling"], feel: ["felt","feeling"], find: ["found","finding"],
+  fly: ["flew","flown","flying"], forget: ["forgot","forgotten","forgetting"], get: ["got","gotten","getting"],
+  give: ["gave","given","giving"], go: ["goes","went","gone","going"], grow: ["grew","grown","growing"],
+  have: ["has","had","having"], hear: ["heard","hearing"], hide: ["hid","hidden","hiding"], hold: ["held","holding"],
+  keep: ["kept","keeping"], know: ["knew","known","knowing"], lead: ["led","leading"], learn: ["learnt","learned","learning"],
+  leave: ["left","leaving"], lose: ["lost","losing"], make: ["made","making"], mean: ["meant","meaning"],
+  meet: ["met","meeting"], pay: ["paid","paying"], put: ["put","putting"], read: ["read","reading"],
+  ride: ["rode","ridden","riding"], run: ["ran","run","running"], say: ["said","saying"], see: ["saw","seen","seeing"],
+  sell: ["sold","selling"], send: ["sent","sending"], set: ["set","setting"], show: ["showed","shown","showing"],
+  sing: ["sang","sung","singing"], sit: ["sat","sitting"], sleep: ["slept","sleeping"], speak: ["spoke","spoken","speaking"],
+  spend: ["spent","spending"], stand: ["stood","standing"], swim: ["swam","swum","swimming"], take: ["took","taken","taking"],
+  teach: ["taught","teaching"], tell: ["told","telling"], think: ["thought","thinking"], throw: ["threw","thrown","throwing"],
+  understand: ["understood","understanding"], wear: ["wore","worn","wearing"], win: ["won","winning"], write: ["wrote","written","writing"],
+};
+
+// Generate likely regular inflections of a single word (lowercased).
+function regularForms(w: string): string[] {
+  const forms = new Set<string>([w]);
+  // plural / 3rd person -s / -es / -ies
+  if (/[^aeiou]y$/.test(w)) forms.add(w.slice(0, -1) + "ies");
+  else if (/(s|sh|ch|x|z)$/.test(w)) forms.add(w + "es");
+  else forms.add(w + "s");
+  // -ed / -d / -ied / doubled consonant
+  if (w.endsWith("e")) forms.add(w + "d");
+  else if (/[^aeiou]y$/.test(w)) forms.add(w.slice(0, -1) + "ied");
+  else forms.add(w + "ed");
+  // -ing
+  if (w.endsWith("e") && !w.endsWith("ee")) forms.add(w.slice(0, -1) + "ing");
+  else forms.add(w + "ing");
+  // simple doubled-consonant past/gerund for short CVC words (e.g. stop->stopped)
+  if (/^[a-z]*[aeiou][bcdfghjklmnpqrstvwxz]$/.test(w) && w.length <= 5) {
+    const d = w + w[w.length - 1];
+    forms.add(d + "ed"); forms.add(d + "ing");
+  }
+  return [...forms];
+}
+
+// Build the set of forms to highlight for a vocab item: its own words, admin
+// "forms" overrides, irregular-verb table, and automatic regular inflections.
+function buildWordForms(headword: string, phrase: string, extra?: string[]): string[] {
+  const set = new Set<string>();
+  const base = (headword || phrase).toLowerCase().trim();
+  const words = base.split(/\s+/);
+  // Multi-word phrase: match the whole phrase and each significant word's forms
+  if (words.length > 1) { set.add(base); }
+  const primary = words[words.length - 1]; // last word usually carries inflection
+  for (const w of [base, primary]) {
+    if (!w) continue;
+    regularForms(w).forEach(f => set.add(f));
+    if (IRREGULAR_VERBS[w]) IRREGULAR_VERBS[w].forEach(f => set.add(f));
+  }
+  (extra ?? []).forEach(f => f && set.add(f.toLowerCase().trim()));
+  // also the exact displayed phrase
+  set.add(phrase.toLowerCase().trim());
+  return [...set].filter(Boolean).sort((a, b) => b.length - a.length);
+}
+
+// Highlight the vocab word (any matched form) inside an example sentence,
+// tinting it with a pastel version of its CEFR color.
+function highlightWordInSentence(sentence: string, v: ArticleVocab): React.ReactNode {
+  const forms = buildWordForms(v.headword, v.phrase, v.forms);
+  if (!forms.length) return sentence;
+  // word-boundary regex; escape special chars
+  const esc = forms.map(f => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`\\b(${esc.join("|")})\\b`, "gi");
+  const color = CEFR_COLOR_MAP[v.cefr] ?? "#4A6163";
+  const parts: React.ReactNode[] = [];
+  let last = 0; let m: RegExpExecArray | null; let k = 0;
+  while ((m = re.exec(sentence)) !== null) {
+    if (m.index > last) parts.push(sentence.slice(last, m.index));
+    parts.push(
+      <mark key={k++} className="vocab-hl" style={{ ["--hl" as string]: color }}>{m[0]}</mark>
+    );
+    last = m.index + m[0].length;
+    if (re.lastIndex === m.index) re.lastIndex++; // avoid zero-length loop
+  }
+  if (last < sentence.length) parts.push(sentence.slice(last));
+  return parts.length ? parts : sentence;
 }
 
 function colorFor(video: Video, i: number) {
@@ -651,7 +742,12 @@ function ArticleEditModal({ video, token, onClose, onSaved, onToast }: {
 
   const addVocab = () => setVocab([...vocab, { phrase: "", headword: "", cefr: "B1", pos: "noun", meaningEN: "", meaningTH: "", exampleEN: "", exampleTH: "", pronunciation: "" }]);
   const removeVocab = (i: number) => setVocab(vocab.filter((_, j) => j !== i));
-  const updateVocab = (i: number, field: keyof ArticleVocab, val: string) => { const copy = [...vocab]; copy[i] = { ...copy[i], [field]: val }; setVocab(copy); };
+  const updateVocab = (i: number, field: keyof ArticleVocab, val: string) => {
+    const copy = [...vocab];
+    if (field === "forms") { copy[i] = { ...copy[i], forms: val.split(",").map(s => s.trim()).filter(Boolean) }; }
+    else { copy[i] = { ...copy[i], [field]: val }; }
+    setVocab(copy);
+  };
 
   const handleSave = async () => {
     if (!title.trim() || !summaryEN.trim()) { onToast("Title and English summary are required.", "error"); return; }
@@ -670,6 +766,7 @@ function ArticleEditModal({ video, token, onClose, onSaved, onToast }: {
         exampleEN: v.exampleEN.trim(),
         exampleTH: v.exampleTH.trim(),
         pronunciation: v.pronunciation?.trim() || undefined,
+        forms: (v.forms ?? []).map(f => f.trim()).filter(Boolean),
       }));
     setSaving(true);
     const data: ArticleData = {
@@ -804,7 +901,8 @@ function ArticleEditModal({ video, token, onClose, onSaved, onToast }: {
                 <input className="edit-input" value={v.meaningTH} onChange={e => updateVocab(i, "meaningTH", e.target.value)} placeholder="🇹🇭 ความหมายไทย" style={{ marginBottom: 4 }} />
                 <input className="edit-input" value={v.exampleEN} onChange={e => updateVocab(i, "exampleEN", e.target.value)} placeholder="Example sentence (EN)" style={{ marginBottom: 4 }} />
                 <input className="edit-input" value={v.exampleTH} onChange={e => updateVocab(i, "exampleTH", e.target.value)} placeholder="ตัวอย่างประโยค (ไทย)" style={{ marginBottom: 4 }} />
-                <input className="edit-input" value={v.pronunciation ?? ""} onChange={e => updateVocab(i, "pronunciation", e.target.value)} placeholder="Pronunciation text (optional, if different)" />
+                <input className="edit-input" value={v.pronunciation ?? ""} onChange={e => updateVocab(i, "pronunciation", e.target.value)} placeholder="Pronunciation text (optional, if different)" style={{ marginBottom: 4 }} />
+                <input className="edit-input" value={(v.forms ?? []).join(", ")} onChange={e => updateVocab(i, "forms", e.target.value)} placeholder="Extra forms to highlight, comma-separated (optional) — e.g. went, gone" />
               </div>
             ))}
             <button className="edit-add-btn" onClick={addVocab}>+ Add vocabulary</button>
@@ -901,6 +999,7 @@ function ArticleImportModal({ token, existingIds, onClose, onSaved, onToast }: {
         exampleEN: String(v.exampleEN || "").trim(),
         exampleTH: String(v.exampleTH || "").trim(),
         pronunciation: v.pronunciation ? String(v.pronunciation).trim() : undefined,
+        forms: Array.isArray(v.forms) ? (v.forms as string[]).map(f => String(f).trim()).filter(Boolean) : undefined,
       })),
       synonyms: [], antonyms: [], keyWords: [], examples: [],
       usage: "", context: "",
@@ -1046,6 +1145,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
   const [activePara, setActivePara] = useState(-1);
+  const [wordRange, setWordRange] = useState<{ start: number; end: number } | null>(null);
   const [selectedVocab, setSelectedVocab] = useState<{ v: ArticleVocab; rect: DOMRect } | null>(null);
   const openVocab = (v: ArticleVocab, rect: DOMRect) => setSelectedVocab({ v, rect });
   const stoppedRef = useRef(false);
@@ -1069,17 +1169,28 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
     }
     window.speechSynthesis.cancel();
     stoppedRef.current = false;
-    setPlaying(true); setPaused(false);
+    setPlaying(true); setPaused(false); setWordRange(null);
     let idx = fromStart ? 0 : Math.max(0, activePara);
     const speakPara = () => {
-      if (stoppedRef.current || idx >= paragraphs.length) { setPlaying(false); setActivePara(-1); return; }
-      setActivePara(idx);
-      const u = new SpeechSynthesisUtterance(paragraphs[idx]);
+      if (stoppedRef.current || idx >= paragraphs.length) { setPlaying(false); setActivePara(-1); setWordRange(null); return; }
+      setActivePara(idx); setWordRange(null);
+      const text = paragraphs[idx];
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = synthLang;
       u.rate = lang === "th" ? 0.9 : 0.86;
       u.pitch = lang === "th" ? 1.0 : 1.03;
       if (voice) u.voice = voice;
-      u.onend = () => { idx++; if (!stoppedRef.current) speakPara(); };
+      // Word-by-word highlight: onboundary reports the char index of each word.
+      u.onboundary = (ev: SpeechSynthesisEvent) => {
+        if (stoppedRef.current) return;
+        if (ev.name && ev.name !== "word") return;
+        const start = ev.charIndex ?? 0;
+        // Derive word end: use charLength if provided, else scan to next space.
+        let end = start + (ev.charLength ?? 0);
+        if (!ev.charLength) { const nextSpace = text.slice(start).search(/\s|$/); end = start + (nextSpace === -1 ? text.length - start : nextSpace); }
+        setWordRange({ start, end });
+      };
+      u.onend = () => { setWordRange(null); idx++; if (!stoppedRef.current) speakPara(); };
       window.speechSynthesis.speak(u);
     };
     speakPara();
@@ -1087,7 +1198,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
 
   const pausePlayback = () => { if (window.speechSynthesis) { window.speechSynthesis.pause(); setPaused(true); } };
   const resumePlayback = () => { if (window.speechSynthesis) { window.speechSynthesis.resume(); setPaused(false); } };
-  const stopPlayback = () => { stoppedRef.current = true; if (window.speechSynthesis) window.speechSynthesis.cancel(); setPlaying(false); setPaused(false); setActivePara(-1); };
+  const stopPlayback = () => { stoppedRef.current = true; if (window.speechSynthesis) window.speechSynthesis.cancel(); setPlaying(false); setPaused(false); setActivePara(-1); setWordRange(null); };
   const restartPlayback = () => { stopPlayback(); setTimeout(() => startPlayback(true), 60); };
   const switchLang = (l: "en" | "th") => { stopPlayback(); setLang(l); };
 
@@ -1137,13 +1248,24 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
           </div>
 
           <article className="article-passage">
-            {paragraphs.map((p, i) => (
-              <p key={i} className={`article-para ${activePara === i ? "reading" : ""}`}>
-                {lang === "en"
-                  ? renderAnnotatedParagraph(p, data.vocabulary ?? [], openVocab)
-                  : p}
-              </p>
-            ))}
+            {paragraphs.map((p, i) => {
+              const isReading = activePara === i;
+              let content: React.ReactNode;
+              if (isReading && wordRange) {
+                // While being read, highlight the current word (word-by-word).
+                const { start, end } = wordRange;
+                const s = Math.max(0, Math.min(start, p.length));
+                const e = Math.max(s, Math.min(end, p.length));
+                content = <>{p.slice(0, s)}<mark className="reading-word">{p.slice(s, e)}</mark>{p.slice(e)}</>;
+              } else if (lang === "en") {
+                content = renderAnnotatedParagraph(p, data.vocabulary ?? [], openVocab);
+              } else {
+                content = p;
+              }
+              return (
+                <p key={i} className={`article-para ${isReading ? "reading" : ""}`}>{content}</p>
+              );
+            })}
             {paragraphs.length === 0 && <p className="article-para" style={{ color: "var(--text-muted)" }}>No {lang === "en" ? "English" : "Thai"} content available.</p>}
           </article>
 
@@ -1172,7 +1294,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
                       </div>
                       <div className="keyword-def-en">🇬🇧 {v.meaningEN}</div>
                       <div className="keyword-def-th">🇹🇭 {v.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(v.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
-                      {v.exampleEN && <div className="article-vocab-ex">“{v.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(v.exampleEN)} title="Listen">🔊</button></div>}
+                      {v.exampleEN && <div className="article-vocab-ex">“{highlightWordInSentence(v.exampleEN, v)}” <button className="speak-btn-sm" onClick={() => speakWord(v.exampleEN)} title="Listen">🔊</button></div>}
                       {v.exampleTH && <div className="article-vocab-ex th">“{v.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(v.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
                     </div>
                   );
@@ -1184,23 +1306,10 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
 
         {selectedVocab && (() => {
           const sv = selectedVocab.v;
-          const r = selectedVocab.rect;
-          // Anchor the popover near the clicked word (viewport-fixed, no scroll jump).
-          const POP_W = 340;
-          const vw = typeof window !== "undefined" ? window.innerWidth : 800;
-          const vh = typeof window !== "undefined" ? window.innerHeight : 600;
-          let left = r.left + r.width / 2 - POP_W / 2;
-          left = Math.max(12, Math.min(left, vw - POP_W - 12));
-          // Prefer below the word; flip above if not enough room.
-          const below = r.bottom + 10;
-          const showAbove = below > vh - 220;
-          const posStyle: React.CSSProperties = showAbove
-            ? { left, bottom: Math.max(12, vh - r.top + 10), maxHeight: r.top - 24 }
-            : { left, top: below, maxHeight: vh - below - 16 };
           return (
-            <div className="vocab-popover-overlay" onClick={() => setSelectedVocab(null)}>
-              <div className="vocab-popover anchored" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
-                style={{ ...posStyle, width: POP_W, borderTop: `3px solid ${CEFR_COLOR_MAP[sv.cefr] ?? "var(--slate)"}` }}>
+            <div className="vocab-popover-overlay centered" onClick={() => setSelectedVocab(null)}>
+              <div className="vocab-popover" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
+                style={{ borderTop: `3px solid ${CEFR_COLOR_MAP[sv.cefr] ?? "var(--slate)"}` }}>
                 <button className="modal-close" style={{ top: 10, right: 10, width: 30, height: 30 }} onClick={() => setSelectedVocab(null)} aria-label="Close">✕</button>
                 <div className="keyword-word" style={{ fontSize: 20 }}>{sv.phrase} <button className="speak-btn" onClick={() => speakWord(sv.pronunciation || sv.phrase)} title="Listen" aria-label="Listen to pronunciation">🔊</button></div>
                 <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
@@ -1209,7 +1318,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
                 </div>
                 <div className="keyword-def-en">🇬🇧 {sv.meaningEN}</div>
                 <div className="keyword-def-th">🇹🇭 {sv.meaningTH} <button className="speak-btn-sm" onClick={() => speakThai(sv.meaningTH)} title="ฟังภาษาไทย">🔊</button></div>
-                {sv.exampleEN && <div className="article-vocab-ex">“{sv.exampleEN}” <button className="speak-btn-sm" onClick={() => speakWord(sv.exampleEN)} title="Listen">🔊</button></div>}
+                {sv.exampleEN && <div className="article-vocab-ex">“{highlightWordInSentence(sv.exampleEN, sv)}” <button className="speak-btn-sm" onClick={() => speakWord(sv.exampleEN)} title="Listen">🔊</button></div>}
                 {sv.exampleTH && <div className="article-vocab-ex th">“{sv.exampleTH}” <button className="speak-btn-sm" onClick={() => speakThai(sv.exampleTH)} title="ฟังภาษาไทย">🔊</button></div>}
                 {onSaveWord && (() => {
                   const wid = vocabId(sv); const saved = savedWordIds?.has(wid);
