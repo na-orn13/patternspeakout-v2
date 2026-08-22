@@ -1142,11 +1142,12 @@ function renderAnnotatedParagraph(
   return <>{nodes}</>;
 }
 
-function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds, onSaveWord }: {
+function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds, onSaveWord, onGuestSave }: {
   video: Video; epNumber: number; onClose: () => void;
   isAdmin?: boolean; onEdit?: () => void;
   savedWordIds?: Set<string>;
   onSaveWord?: (wordId: string, wordData: Record<string, unknown>) => void;
+  onGuestSave?: () => void;
 }) {
   const data = getIdiomData(video) as ArticleData | null;
   const cefrColor = data?.cefr ? (CEFR_COLOR_MAP[data.cefr] ?? "var(--slate)") : "var(--slate)";
@@ -1214,7 +1215,7 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
   const vocabId = (v: ArticleVocab) => `word_${(v.headword || v.phrase).toLowerCase().replace(/\s+/g, "_")}`;
   const isVocabSaved = (v: ArticleVocab) => !!savedWordIds?.has(vocabId(v));
   const addVocabWord = (v: ArticleVocab) => {
-    if (!onSaveWord) return;
+    if (!onSaveWord) { onGuestSave?.(); return; }
     if (isVocabSaved(v)) return;
     onSaveWord(vocabId(v), { word: v.headword || v.phrase, cefr: v.cefr, pos: v.pos, definitionEN: v.meaningEN, definitionTH: v.meaningTH, example: v.exampleEN });
   };
@@ -1296,13 +1297,11 @@ function ArticleModal({ video, epNumber, onClose, isAdmin, onEdit, savedWordIds,
                         <div className="keyword-badges">
                           <span className={`tag tag-cefr ${v.cefr}`}>{v.cefr}</span>
                           <span className="tag tag-pos">{v.pos}</span>
-                          {onSaveWord && (
-                            <button className={`word-save-btn ${saved ? "saved" : ""}`}
-                              onClick={() => !saved && onSaveWord(wid, { word: v.headword || v.phrase, cefr: v.cefr, pos: v.pos, definitionEN: v.meaningEN, definitionTH: v.meaningTH, example: v.exampleEN })}
-                              title={saved ? "Already in deck" : "Save to flashcard deck"} aria-label={saved ? "Already in deck" : "Save to flashcard deck"}>
-                              {saved ? "✅" : "➕"}
-                            </button>
-                          )}
+                          <button className={`word-save-btn ${saved ? "saved" : ""}`}
+                            onClick={() => addVocabWord(v)}
+                            title={saved ? "Already in deck" : "Save to flashcard deck"} aria-label={saved ? "Already in deck" : "Save to flashcard deck"}>
+                            {saved ? "✅" : "➕"}
+                          </button>
                         </div>
                       </div>
                       <div className="keyword-def-en">🇬🇧 {v.meaningEN}</div>
@@ -2298,9 +2297,10 @@ export default function Home() {
             try {
               await fetch("/api/favourites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: userSession.id, tiktokId: wordId, action: "add", itemType: "word", wordData }) });
               setSavedWords(prev => [...prev, { id: wordId, data: wordData }]);
-              // No toast — silent add per design.
+              showToast(`📝 "${(wordData as {word?:string}).word}" added to your deck!`, "success");
             } catch { /* ignore */ }
           } : undefined}
+          onGuestSave={() => showToast("Please sign in to save to your deck", "error")}
         />
       ) : (
         <DetailModal video={selectedVideo.video} index={selectedVideo.index} epNumber={epMap.get(selectedVideo.video.tiktok_id) ?? (selectedVideo.index + 1)} onClose={() => setSelectedVideo(null)}

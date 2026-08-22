@@ -785,12 +785,14 @@ body {
 }
 
 .example-en .highlight-idiom {
-  color: var(--slate);
   font-style: normal;
   font-weight: 600;
-  background: rgba(74,97,99,0.06);
   padding: 0 4px;
   border-radius: 4px;
+}
+/* Highlighted phrase inside example sentences uses its CEFR pastel colour */
+.example-en mark.vocab-hl {
+  font-style: normal;
 }
 
 .example-th {
@@ -3068,11 +3070,11 @@ mark.reading-word {
 
 /* Pastel CEFR-colored highlight of a vocab word inside example sentences */
 mark.vocab-hl {
-  background: color-mix(in srgb, var(--hl, #4A6163) 22%, transparent);
-  color: inherit;
-  font-weight: 600;
+  background: color-mix(in srgb, var(--hl, #4A6163) 28%, transparent);
+  color: color-mix(in srgb, var(--hl, #4A6163) 70%, #000);
+  font-weight: 700;
   border-radius: 3px;
-  padding: 0 2px;
+  padding: 1px 4px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
