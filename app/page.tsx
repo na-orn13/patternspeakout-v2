@@ -2182,6 +2182,35 @@ export default function Home() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Restore the login session on page load (survives refresh & tab close) ──
+  // Auth is persisted in localStorage under deck_userId ("admin" or a user UUID),
+  // admin_token (admin bearer), and deck_displayName. sessionStorage is kept in
+  // sync as well so other pages (/deck, /stats) that read it keep working.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedId = localStorage.getItem("deck_userId") || sessionStorage.getItem("deck_userId");
+      if (!storedId) return;
+      const storedName = localStorage.getItem("deck_displayName") || "";
+      if (storedId === "admin") {
+        const t = localStorage.getItem("admin_token") || sessionStorage.getItem("admin_token") || "";
+        setAdminToken(t);
+        setUserSession({ id: "admin", email: "admin", displayName: storedName || "admin_pimjaa13", role: "admin" });
+        sessionStorage.setItem("deck_userId", "admin");
+        if (t) sessionStorage.setItem("admin_token", t);
+      } else {
+        setAdminToken("");
+        setUserSession({ id: storedId, email: "", displayName: storedName || "User", role: "user" });
+        sessionStorage.setItem("deck_userId", storedId);
+        // Restore the user's favourites + saved words
+        fetch(`/api/favourites?userId=${storedId}`)
+          .then(r => r.json())
+          .then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); if (d.words) setSavedWords(d.words); })
+          .catch(() => {});
+      }
+    } catch { /* storage unavailable — ignore */ }
+  }, []);
+
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, type });
@@ -2344,7 +2373,8 @@ export default function Home() {
   const handleSignOut = useCallback(() => {
     if (!confirm("Do you want to log out?")) return;
     setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]);
-    sessionStorage.removeItem("deck_userId");
+    sessionStorage.removeItem("deck_userId"); sessionStorage.removeItem("admin_token");
+    localStorage.removeItem("deck_userId"); localStorage.removeItem("admin_token"); localStorage.removeItem("deck_displayName");
   }, []);
 
   return (
@@ -2420,16 +2450,27 @@ export default function Home() {
       </section>
 
       <SidePanel open={adminOpen} onClose={() => setAdminOpen(false)} onToast={showToast} onRefresh={() => fetchVideos(true)} initialTab={panelInitialTab}
-        onUpdateName={(name) => setUserSession(prev => prev ? { ...prev, displayName: name } : prev)}
+        onUpdateName={(name) => { setUserSession(prev => prev ? { ...prev, displayName: name } : prev); try { localStorage.setItem("deck_displayName", name); } catch {} }}
         onAuth={(t, role, displayName) => {
-          if (role === "admin") { setAdminToken(t); setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" }); sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t); }
+          if (role === "admin") {
+            setAdminToken(t);
+            setUserSession({ id: "admin", email: "admin", displayName: "admin_pimjaa13", role: "admin" });
+            // Persist (localStorage survives refresh + browser restart; sessionStorage kept for other pages)
+            sessionStorage.setItem("deck_userId", "admin"); sessionStorage.setItem("admin_token", t);
+            localStorage.setItem("deck_userId", "admin"); localStorage.setItem("admin_token", t); localStorage.setItem("deck_displayName", "admin_pimjaa13");
+          }
           else if (role === "user" && t) {
             setAdminToken("");
             // Fetch user info from token (user UUID)
             fetch(`/api/favourites?userId=${t}`).then(r => r.json()).then(d => { if (d.favourites) setFavourites(new Set(d.favourites)); if (d.words) setSavedWords(d.words); });
             setUserSession({ id: t, email: "", displayName: displayName || "User", role: "user" });
             sessionStorage.setItem("deck_userId", t);
-          } else { setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]); sessionStorage.removeItem("deck_userId"); }
+            localStorage.setItem("deck_userId", t); localStorage.setItem("deck_displayName", displayName || "User"); localStorage.removeItem("admin_token");
+          } else {
+            setAdminToken(""); setUserSession(null); setFavourites(new Set()); setSavedWords([]);
+            sessionStorage.removeItem("deck_userId"); sessionStorage.removeItem("admin_token");
+            localStorage.removeItem("deck_userId"); localStorage.removeItem("admin_token"); localStorage.removeItem("deck_displayName");
+          }
         }}
         userSession={userSession} adminToken={adminToken} videos={videos} favourites={favourites} savedWords={savedWords}
         onToggleFav={async (tiktokId) => {

@@ -18,16 +18,17 @@ export default function StatsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const adminToken = sessionStorage.getItem("deck_userId");
-    if (!adminToken || adminToken !== "admin") {
+    const adminId = localStorage.getItem("deck_userId") || sessionStorage.getItem("deck_userId");
+    if (!adminId || adminId !== "admin") {
       setError("Admin access required. Please sign in as admin from the main page.");
       setLoading(false);
       return;
     }
+    const adminBearer = localStorage.getItem("admin_token") || sessionStorage.getItem("admin_token") || "";
 
     // Fetch stats from the API
     fetch("/api/analytics", {
-      headers: { Authorization: `Bearer ${sessionStorage.getItem("admin_token") ?? ""}` },
+      headers: { Authorization: `Bearer ${adminBearer}` },
     })
       .then((r) => r.json())
       .then((d) => {

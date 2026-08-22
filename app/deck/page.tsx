@@ -120,7 +120,7 @@ export default function DeckPage() {
 
   // Check if user is already logged in (stored in sessionStorage)
   useEffect(() => {
-    const stored = sessionStorage.getItem("deck_userId");
+    const stored = localStorage.getItem("deck_userId") || sessionStorage.getItem("deck_userId");
     if (stored) { setUserId(stored); fetchDeck(stored); }
     else setLoading(false);
   }, [fetchDeck]);
@@ -142,6 +142,8 @@ export default function DeckPage() {
       if (!res.ok) { setLoginError(data.error); return; }
       setUserId(data.user.id);
       sessionStorage.setItem("deck_userId", data.user.id);
+      localStorage.setItem("deck_userId", data.user.id);
+      if (data.user.displayName) localStorage.setItem("deck_displayName", data.user.displayName);
       fetchDeck(data.user.id);
     } catch { setLoginError("Network error."); }
     finally { setLoginLoading(false); }
