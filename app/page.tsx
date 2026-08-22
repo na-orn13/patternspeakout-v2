@@ -1467,13 +1467,12 @@ function DetailModal({ video, index, epNumber, onClose, userSession, savedWordId
                   <div className="section-label"><span className="icon">✍️</span>ตัวอย่างประโยค · Example Sentences</div>
                   <div className="example-list">
                     {data.examples.map((ex, i) => {
-                      const escaped = data.idiom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                      const regex = new RegExp(`(${escaped})`, "gi");
-                      const highlighted = ex.en.replace(regex, `<span class="highlight-idiom">$1</span>`);
+                      // Highlight the idiom/phrase in its CEFR pastel colour (matches inflected/irregular forms)
+                      const hlVocab = { phrase: data.idiom, headword: data.idiom, cefr: data.cefr } as ArticleVocab;
                       return (
                         <div key={i} className="example-item">
                           <div className="example-num">{i + 1}</div>
-                          <div className="example-en"><span dangerouslySetInnerHTML={{ __html: `"${highlighted}"` }} /> <button className="speak-btn-sm" onClick={() => speakWord(ex.en)} title="Listen">🔊</button></div>
+                          <div className="example-en">“{highlightWordInSentence(ex.en, hlVocab)}” <button className="speak-btn-sm" onClick={() => speakWord(ex.en)} title="Listen">🔊</button></div>
                           <div className="example-th">{ex.th} <button className="speak-btn-sm" onClick={() => speakThai(ex.th)} title="ฟังภาษาไทย">🔊</button></div>
                         </div>
                       );
