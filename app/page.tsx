@@ -2237,7 +2237,16 @@ export default function Home() {
             <div className="error-state"><span style={{ fontSize: 48 }}>⚠️</span><h3>ไม่สามารถโหลดข้อมูลได้</h3><p>{error}</p><button className="retry-btn" onClick={() => fetchVideos()}>ลองอีกครั้ง</button></div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div className="no-results"><span className="no-results-emoji">{search ? "🔍" : "📭"}</span><h3>{search ? "No results found" : category === "articles" ? "No articles yet" : "No content yet"}</h3><p>{search ? "Try a different search term or filter" : "Sign in (☰) to add new content"}</p></div>
+            <div className="no-results">
+              <span className="no-results-emoji">{search || cefrFilter !== "all" ? "🔍" : "📭"}</span>
+              {search.trim() ? (
+                <><h3>No results found.</h3><p>Try a different search term.</p></>
+              ) : cefrFilter !== "all" ? (
+                <><h3>No content matches these filters.</h3><p>ไม่มีเนื้อหาที่ตรงกับตัวกรองนี้</p></>
+              ) : (
+                <><h3>New content is coming soon.</h3><p>เนื้อหาใหม่กำลังจะมาเร็ว ๆ นี้</p></>
+              )}
+            </div>
           )}
           {!loading && !error && filtered.map((video, i) => {
             const d = getIdiomData(video);

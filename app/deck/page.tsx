@@ -303,8 +303,8 @@ export default function DeckPage() {
           </div>
         ) : shuffledDeck.length === 0 ? (
           <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-            <p>No cards in this category. Try a different filter.</p>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🃏</div>
+            <p>No flashcards in this category yet.<br />ยังไม่มีบัตรคำในหมวดนี้</p>
           </div>
         ) : (
           <div className="flashcard-area">
